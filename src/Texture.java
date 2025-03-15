@@ -38,7 +38,7 @@ public class Texture {
 
     private InputStream createInputStreamFromResourceName(String resourceName) {
         try {
-            return new FileInputStream("C:\\RT\\Cloud\\src\\res\\shaders\\textures\\" + resourceName);
+            return new FileInputStream("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\" + resourceName);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load texture: " + resourceName, e);
         }

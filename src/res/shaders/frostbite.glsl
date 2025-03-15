@@ -48,14 +48,12 @@ uniform mat4 uViewMatrix;
 //light const
 //--------------------------------
 #define LIGHT_ATTENUATION 1.3
-#define LIGHT_INTENSITY 400.0
 
-const float EXTINCTION_MULT = 1.0; // Adjust as needed
+// Debug mode uniform
+uniform int uObjectShape; // sphere, rbox,torus
 
+const float EXTINCTION_MULT = 1.0;
 
-
-// Warm, soft lamp color (feel free to change!)
-const vec3 LAMP_COLOR  = vec3(1.0, 0.8, 0.5);
 
 // Reduced ambient so the scene is mostly dark, lit by the lamp
 const vec3 AMBIENT_LIGHT = vec3(0.01, 0.005, 0.005);
@@ -74,7 +72,7 @@ const float VOLUMETRIC_ABSORPTION = 0.25;
 #define BLEND_STRENGTH 1.75
 #define GROUND_STICK 13.
 #define NUM_OCTAVES 4
-#define NOISE 3.
+#define NOISE 3
 #define NOISE_HEIGHT 2.0
 
 // Raymarch
@@ -91,25 +89,31 @@ const float VOLUMETRIC_ABSORPTION = 0.25;
 #define NUM_MATERIALS (LAMP_MATERIAL_ID + NUM_LIGHTS + 1)
 #define MATERIAL_IS_LIGHT_SOURCE 0x1
 
-// Removed CHECKER_FLOOR_MATERIAL_ID
-
-
-//--------------------------------
-//          Material Struct
-//--------------------------------
-struct Material {
-    vec3 albedo;
-    vec3 emissive;
-    int flags;
-};
+uniform vec3 uAlbedo[NUM_MATERIALS];
+uniform vec3 uEmissive[NUM_MATERIALS];
+uniform int uFlags[NUM_MATERIALS];
 
 
 
-bool IsLightSource(in Material m) {
-    return (m.flags & MATERIAL_IS_LIGHT_SOURCE) != 0;
+// Check if material is a light source
+bool IsLightSource(int materialID) {
+    return (uFlags[materialID] & MATERIAL_IS_LIGHT_SOURCE) != 0;
 }
 
 
+
+// Get material properties directly from indexed uniforms
+vec3 GetMaterialAlbedo(int materialID) {
+    return uAlbedo[materialID];
+}
+
+vec3 GetMaterialEmissive(int materialID) {
+    return uEmissive[materialID];
+}
+
+int GetMaterialFlags(int materialID) {
+    return uFlags[materialID];
+}
 
 
 //--------------------------------
@@ -121,48 +125,12 @@ float GetLightAttenuation(float distanceToLight)
     return 1.0 / pow(distanceToLight, LIGHT_ATTENUATION);
 }
 
-
 //--------------------------------
-//  Phase Function (Henyey-Greenstein)
+//   Beer-Lambert
 //--------------------------------
-float PhaseFunction(float g, float mu) {
-    return (1.0 - g * g) / (4.0 * PI * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+float BeerLambert(float absorptionCoefficient, float distanceTraveled) {
+    return exp(-absorptionCoefficient * distanceTraveled);
 }
-
-
-//--------------------------------
-//  Multiple Octave Scattering Function
-//--------------------------------
-float MultipleOctaveScattering(float density, float mu) {
-    float attenuation = 0.6;   // Controls how quickly extinction decreases per octave
-    float contribution = 1.1;  // Determines the weight of each octave's contribution
-    float phaseAttenuation = 0.4; // Influences the phase function's impact across octaves
-
-    const float scatteringOctaves = 8.0; // Number of scattering events
-
-    float a = 1.0;  // Extinction multiplier for each octave
-    float b = 1.0; // Contribution multiplier for each octave
-    float c = 1.0; // Phase function modifier for each octave
-    float g = 0.85; // Asymmetry parameter for PhaseFunction
-
-    float luminance = 0.0;
-
-    for (float i = 0.0; i < scatteringOctaves; i++) {
-        float phaseFunction = PhaseFunction(0.1 * c, mu);
-        float beers = exp(-density * EXTINCTION_MULT * a);
-
-        luminance += b * phaseFunction * beers;
-
-        a *= attenuation;
-        b *= contribution;
-        c *= (1.0 - phaseAttenuation);
-    }
-    return luminance;
-}
-
-
-
-
 
 //--------------------------------
 //        Color Utilities
@@ -204,7 +172,7 @@ float hash1(float n) {
     return fract(n * 17.0 * fract(n * 0.3183099));
 }
 
-// Classic 3D noise from Inigo Quilez
+// 3D noise from : https://iquilezles.org/articles/morenoise/
 float noise(in vec3 x)
 {
     vec3 p = floor(x);
@@ -244,6 +212,129 @@ const mat3 m3 = mat3(
 -0.60, -0.48,  0.64
 );
 
+// ---------------------------------------------------------------------
+// 1. A Tiling Hash Function for 3D positions
+// (Using a modulo to force periodicity)
+// ---------------------------------------------------------------------
+vec3 hash3(vec3 p) {
+    // Using a modulo constant (e.g. 289) to ensure tiling
+    p = mod(p, 289.0);
+    // Compute three pseudo-random numbers
+    return fract(sin(vec3(
+                     dot(p, vec3(127.1, 311.7, 74.7)),
+                     dot(p, vec3(269.5, 183.3, 246.1)),
+                     dot(p, vec3(113.5, 271.9, 124.6))
+                     )) * 43758.5453);
+}
+
+// ---------------------------------------------------------------------
+// 2. Tileable Worley Noise (Cellular Noise)
+// ---------------------------------------------------------------------
+float worleyTileable(vec3 pos, float repeat) {
+    // Repeat the grid every "repeat" units
+    vec3 p = floor(pos);
+    float minDist = 1e10;
+    // Loop through neighboring cells
+    for (int z = -1; z <= 1; z++) {
+        for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+                // Offset and then wrap the cell index
+                vec3 offset = vec3(x, y, z);
+                vec3 cell = mod(p + offset, repeat);
+                // Get a random point in this cell (using our tiling hash)
+                vec3 featurePoint = cell + hash3(cell);
+                // Compute distance from our sample point to the feature point
+                float d = length(pos - featurePoint);
+                minDist = min(minDist, d);
+            }
+        }
+    }
+    // Invert the value to get billowy, puffy shapes.
+    // (You can adjust the inversion or remapping as needed.)
+    return 1.0 - minDist;
+}
+
+// ---------------------------------------------------------------------
+// 3. Worley FBM (Multiple octaves of Worley noise)
+// This creates a smoother, fractal version of Worley noise.
+// ---------------------------------------------------------------------
+float worleyFBM(vec3 pos, int octaves, float lacunarity, float gain, float repeat) {
+    float sum = 0.0;
+    float amp = 1.0;
+    float freq = 1.0;
+    for (int i = 0; i < octaves; i++) {
+        sum += worleyTileable(pos * freq, repeat) * amp;
+        freq *= lacunarity;
+        amp *= gain;
+    }
+    return sum;
+}
+
+// ---------------------------------------------------------------------
+// 4. Perlin Noise (Tiling version)
+// We modify the hash inside the Perlin implementation to use modulo.
+// ---------------------------------------------------------------------
+float fade(float t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+vec3 randomGradient(vec3 p) {
+    // Wrap p for tiling
+    p = mod(p, 289.0);
+    float angle = fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453) * 6.2831853;
+    float z     = fract(sin(dot(p, vec3(93.9898, 67.345, 54.234))) * 24634.6345);
+    float r     = sqrt(1.0 - z * z);
+    return vec3(cos(angle) * r, sin(angle) * r, z);
+}
+
+float perlinNoise(vec3 pos) {
+    vec3 i = floor(pos);
+    vec3 f = fract(pos);
+    vec3 u = vec3(fade(f.x), fade(f.y), fade(f.z));
+
+    float n000 = dot(randomGradient(i + vec3(0.0, 0.0, 0.0)), f - vec3(0.0, 0.0, 0.0));
+    float n100 = dot(randomGradient(i + vec3(1.0, 0.0, 0.0)), f - vec3(1.0, 0.0, 0.0));
+    float n010 = dot(randomGradient(i + vec3(0.0, 1.0, 0.0)), f - vec3(0.0, 1.0, 0.0));
+    float n110 = dot(randomGradient(i + vec3(1.0, 1.0, 0.0)), f - vec3(1.0, 1.0, 0.0));
+    float n001 = dot(randomGradient(i + vec3(0.0, 0.0, 1.0)), f - vec3(0.0, 0.0, 1.0));
+    float n101 = dot(randomGradient(i + vec3(1.0, 0.0, 1.0)), f - vec3(1.0, 0.0, 1.0));
+    float n011 = dot(randomGradient(i + vec3(0.0, 1.0, 1.0)), f - vec3(0.0, 1.0, 1.0));
+    float n111 = dot(randomGradient(i + vec3(1.0, 1.0, 1.0)), f - vec3(1.0, 1.0, 1.0));
+
+    float nx00 = mix(n000, n100, u.x);
+    float nx01 = mix(n001, n101, u.x);
+    float nx10 = mix(n010, n110, u.x);
+    float nx11 = mix(n011, n111, u.x);
+
+    float nxy0 = mix(nx00, nx10, u.y);
+    float nxy1 = mix(nx01, nx11, u.y);
+
+    return mix(nxy0, nxy1, u.z);
+}
+
+// ---------------------------------------------------------------------
+// 5. Hybrid Perlin-Worley Noise (Cauliflower Look)
+// Use the Worley FBM to remap Perlin noise, "carving" out pieces.
+// ---------------------------------------------------------------------
+float cauliflowerNoise(vec3 pos) {
+    // Get tiling Perlin noise (normalize to [0,1])
+    float p = perlinNoise(pos);
+    p = p * 0.5 + 0.5;
+
+    // Generate Worley FBM (tweak octaves, lacunarity, gain, and repeat as desired)
+    float w = worleyFBM(pos, 4, 2.0, 0.5, 8.0);
+
+    // Remap: using the Worley FBM as a mask to "carve" out the Perlin noise.
+    // You can adjust the mix factor to emphasize more cauliflower detail.
+    float hybrid = mix(p, 0.0, w);
+
+    return hybrid;
+}
+
+
+
+
+
 float fbm(in vec3 x)
 {
     float f = 2.0;
@@ -259,6 +350,7 @@ float fbm(in vec3 x)
     }
     return a;
 }
+
 
 //--------------------------------
 //   Fog Density in the volume
@@ -280,6 +372,18 @@ float SdPlane(vec3 p) {
     return p.y;
 }
 
+
+float SdCube(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
+{
+    vec3 d = abs(p - center) - halfExtents;
+    // Maximum component-wise subtraction for distance outside the cube
+    float outsideDistance = length(max(d, 0.0));
+    // Minimum component-wise maximum for distance inside the cube
+    float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
+    return outsideDistance + insideDistance - roundRadius;
+}
+
+
 float SdSphere(vec3 p, vec3 origin, float s) {
     return length(p - origin) - s;
 }
@@ -299,45 +403,6 @@ float SdRoundedBox(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
 }
 
 
-
-//--------------------------------
-//   Material Constructors
-//--------------------------------
-Material NormalMaterial(vec3 albedo, int flags) {
-    Material m;
-    m.albedo   = albedo;
-    m.emissive = vec3(0);
-    m.flags    = flags;
-    return m;
-}
-
-//--------------------------------
-//   Materials
-//--------------------------------
-Material GetMaterial(int materialID, vec3 position)
-{
-    Material materials[NUM_MATERIALS];
-
-    // Debug
-    materials[DEBUG_MATERIAL_ID] = NormalMaterial(vec3(0.6, 0.6, 0.7), 0);
-
-    // Single lamp
-    materials[LAMP_MATERIAL_ID + 0] = NormalMaterial(
-        uLightColor,  // Emissive color
-        MATERIAL_IS_LIGHT_SOURCE
-    );
-
-    Material mat;
-    if (materialID < int(NUM_MATERIALS)) {
-        mat = materials[materialID];
-    } else {
-        mat = materials[0]; // fallback, could also choose a default non-emissive material
-    }
-
-    // Removed checkerboard pattern logic
-
-    return mat;
-}
 
 
 
@@ -452,7 +517,7 @@ vec3 GetSkyColor(vec3 dir)
 //--------------------------------
 
 
-float SdVolume(vec3 p)
+/*float SdVolume(vec3 p)
 {
     // 1) Distances for each shape
     float dSphere = SdSphere(p, vec3(-10.0, 10.0, 0.0), 10.0);
@@ -467,7 +532,57 @@ float SdVolume(vec3 p)
     d += NOISE_HEIGHT * fbm(fbmCoord);
 
     return d;
+} */
+
+float SdVolume(vec3 p)
+{
+    // Define original positions and sizes
+    vec3 sphereCenter = vec3(-10.0, 10.0, 0.0);
+    float sphereRadius = 10.0;
+
+    vec3 torusCenter = vec3(30.0, 10.0, 0.0);
+    float torusR = 12.0;
+    float torusr = 5.0;
+
+    vec3 boxCenter = vec3(-5.0, 10.0, 30.0);
+    vec3 boxHalfExtents = vec3(4.0, 4.0, 4.0);
+    float boxRoundRadius = 1.0;
+
+    // Define smaller cube parameters for clouds
+    vec3 cubeCenter = vec3(-50.0, 5.0, 0.0); // Position the cube closer to the ground or desired location
+    vec3 cubeHalfExtents = vec3(10.0, 10.0, 10.0); // Reduced size of the cube
+    float cubeRoundRadius = 1.0; // Reduced rounding for sharper edges (optional)
+
+
+    // Combine shapes based on uObjectShape
+    float dSphere = (uObjectShape == 1)
+    ? SdTorus(p, sphereCenter, sphereRadius, 3.0)
+    : SdSphere(p, sphereCenter, sphereRadius);
+
+    float dBox = (uObjectShape == 2)
+    ? SdSphere(p, boxCenter, 3.0)
+    : SdRoundedBox(p, boxCenter, boxHalfExtents, boxRoundRadius);
+
+    float dTorus = (uObjectShape == 3)
+    ? SdRoundedBox(p, torusCenter, vec3(torusR, torusr, torusr), 1.0)
+    : SdTorus(p, torusCenter, torusR, torusr);
+
+    // Add the cube SDF for volumetric clouds
+    float dCube = SdCube(p, cubeCenter, cubeHalfExtents, cubeRoundRadius);
+
+    // Combine the distances using minimum (union) for volumetric clouds
+    // You can adjust the blending method as needed
+    float d = min(dCube, min(dSphere, min(dTorus, dBox)));
+
+    // Add animated fractal noise for volumetric effects
+    vec3 fbmCoord = (p + vec3(iTime * 2.0, 0.0, iTime * 2.0)) / NOISE;
+    d += NOISE_HEIGHT * fbm(fbmCoord);
+
+    return d;
 }
+
+
+
 
 
 //--------------------------------
@@ -493,15 +608,15 @@ out vec3 normal
     return dO;
 }
 
-
-
+//--------------------------------
+//   Volume Light Visibility
+//--------------------------------
 float VolumeLightVisibility(
 in vec3 rO,
 in vec3 rDir,
 in float maxT,
 in int numSteps,
-in float marchSize,
-   float mu // New parameter: cosine of the angle
+in float marchSize
 ) {
     float t = 0.0;
     float lightVis = 1.0;
@@ -510,8 +625,9 @@ in float marchSize,
         if (t > maxT) break;
         vec3 p = rO + t * rDir;
         if (SdVolume(p) < 0.0) {
-            float density = FogDensity(p, SdVolume(p)); // Assuming FogDensity computes local density
-            lightVis *= MultipleOctaveScattering(0.1, mu);
+
+
+            lightVis *= BeerLambert(VOLUMETRIC_ABSORPTION, marchSize);
         }
     }
     return lightVis;
@@ -527,21 +643,22 @@ vec3 Diffuse(in vec3 normal, in vec3 lightVec, in vec3 diffuseColor)
     return clamp(nDotL, 0.0, 1.0) * diffuseColor;
 }
 
-
+//--------------------------------
+//   Summation of (single) Light
+//--------------------------------
 void CalculateLighting(
     vec3 position,
     vec3 normal,
     vec3 reflectionDir,
-    Material material,
+    int materialID,
 inout vec3 color
-) {
+)
+{
+    // Example in CalculateLighting function
     vec3 lightPos   = uLightPosition;
     float lightDist = length(lightPos - position);
     vec3 lightDir   = normalize(lightPos - position);
     vec3 lightColor = uLightColor * GetLightAttenuation(lightDist);
-
-    // Calculate mu (cosine of the angle between view direction and light direction)
-    float mu = dot(-normalize(reflectionDir), lightDir); // Adjust based on desired angle
 
     #if CAST_SHADOW_ON_OPAQUE
     // Shadow: volume-based
@@ -549,22 +666,24 @@ inout vec3 color
         lightColor *= VolumeLightVisibility(
             position, lightDir, lightDist,
             MAX_SHADOWMARCH_STEPS,
-            0.6,
-            mu
+            0.6
         );
     }
+
+
+
     #endif
 
-    // Basic specular
-    color += lightColor * pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
+    // Specular lighting
+    float specular = pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
+    color += lightColor * specular * GetMaterialAlbedo(materialID);
 
-    // Lambertian diffuse
-    color += lightColor * Diffuse(normal, lightDir, material.albedo);
+    // Add emissive color
+    color += GetMaterialEmissive(materialID);
 
-    // A tiny bit of ambient
-    color += AMBIENT_LIGHT * material.albedo;
+    // Add ambient light
+    color += AMBIENT_LIGHT * GetMaterialAlbedo(materialID);
 }
-
 
 
 
@@ -596,9 +715,6 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     // 3) Raymarch volume if we entered
     if (vDepth > 0.0)
     {
-        float attenuationExponent = 2.0; // Example exponent value
-        float mu = 0.0; // Initialize mu; will compute per step
-
         for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
             vDepth += marchSize;
             if (vDepth > oDepth) break;
@@ -609,15 +725,8 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
             if (inVolume) {
                 float prevVisibility = oVisibility;
 
-                // Calculate local density
-                float density = VOLUMETRIC_ABSORPTION * FogDensity(p, sdfValue);
+                oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * FogDensity(p, sdfValue), marchSize);
 
-                // Calculate mu (cosine of angle between light direction and view direction)
-                vec3 lightDir = normalize(uLightPosition - p);
-                mu = dot(rayDir, lightDir); // Adjust based on desired angle relationship
-
-                // Apply MultipleOctaveScattering
-                oVisibility *= MultipleOctaveScattering(density, mu);
 
                 if (oVisibility < MIN_OPACITY) {
                     break;
@@ -631,14 +740,16 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
                     vec3 lightDir  = normalize(lightPos - p);
                     vec3 lightCol  = uLightColor * GetLightAttenuation(lightDist);
 
+
                     if (!IsColorInsignificant(lightCol)) {
-                        float localMu = dot(lightDir, rayDir); // Define mu based on step's light direction
                         lightCol *= VolumeLightVisibility(
                             p, lightDir, lightDist,
-                            MAX_LIGHTMARCH_STEPS, marchSize * 1.4,
-                            localMu
+                            MAX_LIGHTMARCH_STEPS, marchSize * 1.4
                         );
                     }
+
+
+
                     vColor += marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
                 }
 
@@ -648,21 +759,22 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
         }
     }
 
-
     // 4) Opaque shading or sky
     if (materialId != INVALID_MATERIAL_ID)
     {
-        // we hit the lamp
+        // We hit an object
         vec3 position = rayOrigin + rayDir * oDepth;
-        Material material = GetMaterial(materialId, position);
 
-        if (IsLightSource(material)) {
-        /* oColor = min(material.albedo, vec3(1.0)); */
-            //sample sky texture
+        if (IsLightSource(materialId)) {
+            // Output a distinct color for light sources
             oColor = GetSkyColor(rayDir);
+            //oColor = vec3(0.0,0.0,0.0);
         } else {
+            // For other materials, calculate lighting
             vec3 reflectionDir = reflect(rayDir, normal);
-            CalculateLighting(position, normal, reflectionDir, material, oColor);
+
+            // Use the existing CalculateLighting function
+            CalculateLighting(position, normal, reflectionDir, materialId, oColor);
         }
     }
     else
@@ -675,20 +787,6 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
-//--------------------------------
-//   Camera Utility
-//--------------------------------
-float GetCameraPositionYOffset() {
-    return 250.0 * (iMouse.y / iResolution.y);
-}
-
-float GetRotationFactor() {
-    if (iMouse.x <= 0.0) {
-        // default if no mouse input
-        return 0.65;
-    }
-    return iMouse.x / iResolution.x;
-}
 
 //--------------------------------
 //   main() Entry Point
@@ -699,25 +797,35 @@ void main()
     vec2 uv = fragCoord / iResolution.xy;
 
     float aspectRatio = iResolution.x / iResolution.y;
-    float lensWidth   =  aspectRatio; // Adjust based on uLensHeight if needed
+    float lensWidth   = aspectRatio;
 
-    // Extract camera vectors from the view matrix
+    // kamera richtungen
     vec3 cameraForward = normalize(-vec3(uViewMatrix[2][0], uViewMatrix[2][1], uViewMatrix[2][2]));
     vec3 cameraRight   = normalize(vec3(uViewMatrix[0][0], uViewMatrix[0][1], uViewMatrix[0][2]));
     vec3 cameraUp      = normalize(vec3(uViewMatrix[1][0], uViewMatrix[1][1], uViewMatrix[1][2]));
 
-    // Use the camera position directly from the uniform
+    // move camera up and down
     vec3 cameraPosition = uCameraPosition;
-    // Optionally adjust camera Y based on mouse Y input
-    cameraPosition.y += (iMouse.y / iResolution.y) * 50.0; // Adjust multiplier as needed
+    cameraPosition.y += (iMouse.y / iResolution.y) * 90.0;
 
     // Build the ray
     vec3 rayOrigin    = cameraPosition;
     vec3 rayDirection = normalize(cameraForward + (uv.x * 2.0 - 1.0) * cameraRight * lensWidth + (uv.y * 2.0 - 1.0) * cameraUp * 1.0);
 
-    // Render volumetric scene
-    vec3 color = Render(rayOrigin, rayDirection);
+    // Initialize outputs
+    vec3 color = vec3(0.0);
+    vec3 normal = vec3(0.0);
+    int materialID = INVALID_MATERIAL_ID;
 
+    // render volumetric scene
+    float depth = IntersectOpaqueScene(rayOrigin, rayDirection, materialID, normal);
+
+
+    // normal rendering
+    color = Render(rayOrigin, rayDirection);
+
+
+    // Optionally apply noise
     #if USE_BLUE_NOISE
     if (Luminance(color) > NOISE_THRESHOLD) {
     float noiseVal = texture(iChannel0, uv).r - 0.5;

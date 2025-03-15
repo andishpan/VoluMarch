@@ -121,12 +121,6 @@ float GetLightAttenuation(float distanceToLight)
     return 1.0 / pow(distanceToLight, LIGHT_ATTENUATION);
 }
 
-//--------------------------------
-//   Beer-Lambert
-//--------------------------------
-float BeerLambert(float absorptionCoefficient, float distanceTraveled) {
-    return exp(-absorptionCoefficient * distanceTraveled);
-}
 
 //--------------------------------
 //  Phase Function (Henyey-Greenstein)
@@ -499,28 +493,7 @@ out vec3 normal
     return dO;
 }
 
-//--------------------------------
-//   Volume Light Visibility
-//--------------------------------
-/*float VolumeLightVisibility(
-in vec3 rO,
-in vec3 rDir,
-in float maxT,
-in int numSteps,
-in float marchSize
-) {
-    float t = 0.0;
-    float lightVis = 1.0;
-    for (int i = 0; i < numSteps; i++) {
-        t += marchSize;
-        if (t > maxT) break;
-        vec3 p = rO + t * rDir;
-        if (SdVolume(p) < 0.0) {
-            lightVis *= BeerLambert(VOLUMETRIC_ABSORPTION, marchSize);
-        }
-    }
-    return lightVis;
-} */
+
 
 float VolumeLightVisibility(
 in vec3 rO,
@@ -554,44 +527,6 @@ vec3 Diffuse(in vec3 normal, in vec3 lightVec, in vec3 diffuseColor)
     return clamp(nDotL, 0.0, 1.0) * diffuseColor;
 }
 
-//--------------------------------
-//   Summation of (single) Light
-//--------------------------------
-/*void CalculateLighting(
-    vec3 position,
-    vec3 normal,
-    vec3 reflectionDir,
-    Material material,
-inout vec3 color
-)
-{
-    // Example in CalculateLighting function
-    vec3 lightPos   = uLightPosition;
-    float lightDist = length(lightPos - position);
-    vec3 lightDir   = normalize(lightPos - position);
-    vec3 lightColor = uLightColor * GetLightAttenuation(lightDist);
-
-
-    #if CAST_SHADOW_ON_OPAQUE
-    // Shadow: volume-based
-    if (!IsColorInsignificant(lightColor)) {
-        lightColor *= VolumeLightVisibility(
-            position, lightDir, lightDist,
-            MAX_SHADOWMARCH_STEPS,
-            0.6
-        );
-    }
-    #endif
-
-    // Basic specular
-    color += lightColor * pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
-
-    // Lambertian diffuse
-    color += lightColor * Diffuse(normal, lightDir, material.albedo);
-
-    // A tiny bit of ambient
-    color += AMBIENT_LIGHT * material.albedo;
-} */
 
 void CalculateLighting(
     vec3 position,
@@ -713,45 +648,6 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
         }
     }
 
-
-/*  if (vDepth > 0.0)
-    {
-        for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
-            vDepth += marchSize;
-            if (vDepth > oDepth) break;
-
-            vec3 p = rayOrigin + rayDir * vDepth;
-            float sdfValue = SdVolume(p);
-            bool inVolume  = (sdfValue < 0.0);
-            if (inVolume) {
-                float prevVisibility = oVisibility;
-                oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * FogDensity(p, sdfValue), marchSize);
-                if (oVisibility < MIN_OPACITY) {
-                    break;
-                }
-                float marchAbsorption = prevVisibility - oVisibility;
-
-                // Single lamp
-                {
-                    vec3 lightPos  = uLightPosition;
-                    float lightDist= length(lightPos - p);
-                    vec3 lightDir  = normalize(lightPos - p);
-                    vec3 lightCol  = uLightColor * GetLightAttenuation(lightDist);
-
-                    if (!IsColorInsignificant(lightCol)) {
-                        lightCol *= VolumeLightVisibility(
-                            p, lightDir, lightDist,
-                            MAX_LIGHTMARCH_STEPS, marchSize * 1.4
-                        );
-                    }
-                    vColor += marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
-                }
-
-                // Ambient
-                vColor += marchAbsorption * VOLUMETRIC_ALBEDO * AMBIENT_LIGHT;
-            }
-        }
-    } */
 
     // 4) Opaque shading or sky
     if (materialId != INVALID_MATERIAL_ID)
