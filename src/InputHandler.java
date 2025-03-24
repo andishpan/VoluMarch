@@ -13,7 +13,7 @@ public class InputHandler {
     private void setupCallbacks() {
         glfwSetCursorPosCallback(window, (win, xpos, ypos) -> {
             mouseX = (float) xpos;
-            mouseY = (float) ypos; // Adjust y if needed (e.g. invert based on your coordinate system)
+            mouseY = (float) ypos;
         });
 
         glfwSetMouseButtonCallback(window, (win, button, action, mods) -> {

@@ -201,6 +201,11 @@ vec3 LinearToSRGB(vec3 rgb)
 // 1. PERLIN NOISE
 // -------------------------
 
+// Fade function for Perlin noise
+float fade(float t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
 // Returns a pseudo-random gradient vector for a given 3D integer coordinate
 vec3 randomGradient(vec3 p) {
     // Generate an angle and a "z" value from the cell coordinate.
@@ -284,7 +289,7 @@ float perlinWorleyNoise(vec3 pos) {
     // Normalize Perlin noise to [0, 1]
     p = p * 0.5 + 0.5;
     float w = worleyNoise(pos);
-    // Invert Worley noise (so that cells appear as “dips” or “cracks”) and blend 50:50.
+    // Invert Worley noise (so that cells appear as "dips" or "cracks") and blend 50:50.
     return mix(p, 1.0 - w, 0.5);
 }
 

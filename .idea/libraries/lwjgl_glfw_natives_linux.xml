@@ -14,6 +14,7 @@
       <root url="jar://$PROJECT_DIR$/lib/lwjgl-stb.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/lwjgl.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/slick.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/lwjgl-stb-natives-windows.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>

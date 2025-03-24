@@ -192,6 +192,33 @@ public class Matrix4 {
     }
 
 
+    public static Matrix4 perspective(float fovDegrees, float aspect, float near, float far) {
+        Matrix4 result = new Matrix4();
+
+        // First, zero everything out.
+        // We'll fill the needed elements below.
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                result.daten[row][col] = 0.0f;
+            }
+        }
+
+        float fovRad = (float) Math.toRadians(fovDegrees);
+        float tanHalfFOV = (float) Math.tan(fovRad / 2.0f);
+
+        // The common perspective projection formula:
+        result.daten[0][0] = 1.0f / (aspect * tanHalfFOV);
+        result.daten[1][1] = 1.0f / tanHalfFOV;
+        result.daten[2][2] = -(far + near) / (far - near);
+        result.daten[2][3] = -1.0f;
+        result.daten[3][2] = -(2.0f * far * near) / (far - near);
+        // [3][3] remains 0, since that’s how perspective divide is introduced
+
+        return result;
+    }
+
+
+
     public static Matrix4 lookAt(Vector3f eye, Vector3f center, Vector3f up) {
         Vector3f f = center.subtract(eye).normalize(); // Forward
         Vector3f s = f.cross(up).normalize();          // Right

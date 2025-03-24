@@ -6,6 +6,7 @@ out vec4 fragColor;
 
 uniform float iTime;         // Elapsed time in seconds
 uniform sampler2D iChannel0; // For noise texture, etc.
+uniform sampler3D uNoiseTexture; // 3D noise texture
 
 
 
@@ -26,6 +27,7 @@ uniform float uLightRadius;   // Light's spherical influence radius
 // Features
 #define CAST_SHADOW_ON_OPAQUE 1
 #define USE_BLUE_NOISE 0
+#define USE_3D_NOISE_TEXTURE 1  // New define to toggle between procedural and texture noise
 
 //--------------------------------
 //  Here is where we define we have
@@ -49,10 +51,10 @@ const vec3 AMBIENT_LIGHT = vec3(0.01, 0.005, 0.005);
 
 // Volume
 const vec3 VOLUMETRIC_ALBEDO = vec3(0.95, 0.95, 0.95);
-const float VOLUMETRIC_ABSORPTION = 0.15;
+const float VOLUMETRIC_ABSORPTION = 0.08;  // Reduced absorption for softer clouds
 
 // Minimum opacity for volume steps
-#define MIN_OPACITY 0.05
+#define MIN_OPACITY 0.02  // Reduced for softer edges
 #define NOISE_JITTER 0.02
 #define NOISE_THRESHOLD 0.03
 
@@ -60,15 +62,15 @@ const float VOLUMETRIC_ABSORPTION = 0.15;
 #define BLEND_STRENGTH 1.75
 #define GROUND_STICK 13.
 #define NUM_OCTAVES 4
-#define NOISE 3
-#define NOISE_HEIGHT 2.0
+#define NOISE 6.0  // Increased scale
+#define NOISE_HEIGHT 1.5  // Reduced height impact
 
 // Raymarch
-#define MAX_STEPS 40
-#define MAX_VOLUME_STEPS 40
-#define MAX_SHADOWMARCH_STEPS 25
-#define MAX_LIGHTMARCH_STEPS 25
-#define SURFACE_DIST 0.03
+#define MAX_STEPS 80
+#define MAX_VOLUME_STEPS 80
+#define MAX_SHADOWMARCH_STEPS 50
+#define MAX_LIGHTMARCH_STEPS 50
+#define SURFACE_DIST 0.01
 
 // Materials
 #define INVALID_MATERIAL_ID int(-1)
@@ -325,7 +327,29 @@ float worleyFBM(vec3 p) {
 float FogDensity(vec3 p, float sdfValue)
 {
     float sdfMultiplier = (sdfValue < 0.0) ? min(abs(sdfValue), 1.0) : 0.0;
-    float density = abs(fbm(p / 6.0) + 0.5);
+
+    #if USE_3D_NOISE_TEXTURE
+        // Sample the texture at two different scales and offsets
+        vec3 baseCoord = p * 0.02;
+        vec3 animOffset = vec3(iTime * 0.05, iTime * 0.03, iTime * 0.04);
+
+        // First sample - larger scale
+        vec3 coord1 = fract(baseCoord + animOffset);
+        float noise1 = texture(uNoiseTexture, coord1).r;
+
+        // Second sample - smaller scale for detail
+        vec3 coord2 = fract(baseCoord * 2.0 + animOffset * 1.5);
+        float noise2 = texture(uNoiseTexture, coord2).r;
+
+        // Blend the two noise samples
+        float density = noise1 * 0.7 + noise2 * 0.3;
+
+        // Add a small bias to ensure there's always some base density
+        density = density * 0.8 + 0.5;
+    #else
+        float density = abs(fbm(p / 6.0) + 0.5);
+    #endif
+
     return sdfMultiplier * density;
 }
 
@@ -499,8 +523,32 @@ float SdVolume(vec3 p)
 
     float d = min(dCube, min(dSphere, min(dTorus, dBox)));
 
-    vec3 fbmCoord = (p + vec3(iTime * 2.0, 0.0, iTime * 2.0)) / NOISE;
-    d += NOISE_HEIGHT * fbm(fbmCoord);
+    #if USE_3D_NOISE_TEXTURE
+        // Sample at two different scales for the shape deformation
+        vec3 baseCoord = p * 0.02;
+        vec3 animOffset = vec3(
+            sin(iTime * 0.15) * 0.3,
+            cos(iTime * 0.1) * 0.2,
+            sin(iTime * 0.2) * 0.25
+        );
+
+        // First sample - larger scale
+        vec3 coord1 = fract(baseCoord + animOffset);
+        float noise1 = texture(uNoiseTexture, coord1).r;
+
+        // Second sample - smaller scale for detail
+        vec3 coord2 = fract(baseCoord * 2.0 + animOffset * 1.5);
+        float noise2 = texture(uNoiseTexture, coord2).r;
+
+        // Blend the two noise samples
+        float noiseValue = noise1 * 0.7 + noise2 * 0.3;
+
+        // Center the noise around 0 but with a smaller range to reduce holes
+        d += NOISE_HEIGHT * ((noiseValue - 0.5) * 0.7);
+    #else
+        vec3 fbmCoord = (p + vec3(iTime * 2.0, 0.0, iTime * 2.0)) / NOISE;
+        d += 1.0;
+    #endif
 
     return d;
 }
@@ -585,7 +633,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     vec3 oColor = vec3(0.0);
     float fDepth = SCENE_MAX_T;
     float oVisibility = 1.0;
-    const float marchSize = 0.6;
+    const float marchSize = 0.2;  // Reduced from 0.6 to 0.2 for finer detail
 
     vec3 normal = vec3(0.0);
     vec3 vnormal = vec3(0.0);

@@ -1,41 +1,15 @@
+
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
-import org.newdawn.slick.SlickException;
-import org.newdawn.slick.UnicodeFont;
-import org.newdawn.slick.font.effects.ColorEffect;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.ARBVertexArrayObject.*;
+
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.system.MemoryUtil.*;
-
-import java.io.*;
-import java.text.DecimalFormat;
-
-import org.lwjgl.glfw.*;
-import org.lwjgl.opengl.*;
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.system.MemoryUtil.*;
-
-import org.lwjgl.glfw.*;
-import org.lwjgl.opengl.*;
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.system.MemoryUtil.*;
-
-import org.lwjgl.glfw.*;
-import org.lwjgl.opengl.*;
-import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
 public class VolumeRaymarchLWJGL {
@@ -43,27 +17,36 @@ public class VolumeRaymarchLWJGL {
     private static final int width = 1280;
     private static final int height = 720;
 
-    // Refactored helper classes.
+
     private ShaderProgram shader;
     private Renderer renderer;
     private InputHandler inputHandler;
     private TextRenderer textRenderer;
 
-    // Timing.
+
     private long startTime;
     private double lastFrameTime;
     private float deltaTime;
 
-    // Camera variables.
-    private Vector3f cameraPosition = new Vector3f(0.0f, 30.0f, 40.0f);
-    private Vector3f cameraLookAt   = new Vector3f(20.0f, 10.0f, 0.0f);
-    private Vector3f cameraUp       = new Vector3f(0.0f, 1.0f, 0.0f);
 
-    // Additional rendering parameters.
+    // Put the camera at (0,0,0)
+    private Vector3f cameraPosition = new Vector3f(0.0f, 40.0f, 2.0f);
+
+    // Look “forward” along negative Z, so target a point like (0,0,-1)
+    private Vector3f cameraLookAt   = new Vector3f(0.0f, 0.0f, -1.0f);
+
+    // +Y is still up
+    private Vector3f cameraUp       = new Vector3f(0.0f, 5.0f, 0.0f);
+
+
+
+
+
     private int currentShape = 0;
     private int currentMethod = 0;
     private Material[] materials;
-    private Texture skyTexture;
+    private Texture blueNoise;
+    private Texture3D noiseTexture3D;
 
     public static void main(String[] args) {
         new VolumeRaymarchLWJGL().run();
@@ -97,13 +80,15 @@ public class VolumeRaymarchLWJGL {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        // Initialize shader program.
+
         String vertexShaderPath = "vertex.glsl";
-        String fragmentShaderPath = "beer-lambert.glsl";
+        String fragmentShaderPath = "fragment_c.glsl";
         shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
 
-        // Set initial camera uniforms.
+
         glUseProgram(shader.getID());
+
+
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraPosition"),
                 cameraPosition.x, cameraPosition.y, cameraPosition.z);
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraLookAt"),
@@ -111,31 +96,34 @@ public class VolumeRaymarchLWJGL {
         glUniform1f(glGetUniformLocation(shader.getID(), "uLensHeight"), 2.0f);
         glUniform1f(glGetUniformLocation(shader.getID(), "uFocalDistance"), 7.0f);
 
-        // Set light uniforms.
-        Vector3f scaledLightColor = new Vector3f(1.0f, 1.0f, 1.0f).multiply(250.0f);
+
+        Vector3f scaledLightColor = new Vector3f(1.0f, 1.0f, 1.0f);
         glUniform3f(glGetUniformLocation(shader.getID(), "uLightPosition"), 0.0f, 60.0f, 0.0f);
         glUniform3f(glGetUniformLocation(shader.getID(), "uLightColor"),
                 scaledLightColor.x, scaledLightColor.y, scaledLightColor.z);
         glUniform1f(glGetUniformLocation(shader.getID(), "uLightRadius"), 5.0f);
         glUseProgram(0);
 
-        // Initialize renderer.
+
         renderer = new Renderer(shader);
 
-        // Initialize input handler.
+
         inputHandler = new InputHandler(window);
 
-        // Initialize text renderer.
+
         textRenderer = new TextRenderer(width, height);
         textRenderer.createTextShaders("C:\\RT\\VoluMarch\\src\\res\\shaders\\text_vertex.glsl",
                 "C:\\RT\\VoluMarch\\src\\res\\shaders\\text_fragment.glsl");
         textRenderer.initFontQuad();
-        textRenderer.setUpFonts("Welcome");
+        textRenderer.setUpFonts("Volumetric Rendering");
 
-        // Load the sky texture.
-        skyTexture = new Texture("Sky.jpg");
 
-        // Initialize materials.
+        blueNoise = new Texture("BayerDithering.png");
+
+
+        noiseTexture3D = new Texture3D("VolumeCloud.exr", 64, 64, 64);
+
+
         materials = new Material[2];
         materials[0] = new Material(new Vector3f(1.0f, 1.0f, 1.0f),
                 new Vector3f(1.0f, 1.0f, 1.0f), 1);
@@ -143,13 +131,22 @@ public class VolumeRaymarchLWJGL {
                 new Vector3f(0.0f, 0.0f, 0.0f), 0);
         Material.uploadMaterialUniforms(shader.getID(), materials);
 
+
+
+
+
+        glUseProgram(shader.getID());
+        noiseTexture3D.bind(1);
+        glUniform1i(glGetUniformLocation(shader.getID(), "uNoiseTexture"), 1);
+        glUseProgram(0);
+
         startTime = System.currentTimeMillis();
         lastFrameTime = glfwGetTime();
 
-        // Setup key callbacks.
+
         setupKeyCallbacks();
 
-        // (Mouse callbacks are handled by InputHandler.)
+
     }
 
     private void loop() {
@@ -161,7 +158,7 @@ public class VolumeRaymarchLWJGL {
 
             handleKeyboardInput();
 
-            // Compute elapsed time.
+
             float elapsedTime = (System.currentTimeMillis() - startTime) * 0.001f;
             float mouseX = inputHandler.getMouseX();
             float mouseY = inputHandler.getMouseY();
@@ -170,13 +167,13 @@ public class VolumeRaymarchLWJGL {
             glViewport(0, 0, width, height);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Render the 3D scene using our new renderer method (which sets all uniforms as before).
+
             renderer.render(elapsedTime, width, height,
                     mouseX, mouseY, mouseDown,
                     cameraPosition, cameraLookAt, cameraUp,
-                    currentShape, currentMethod, materials, skyTexture);
+                    currentShape, currentMethod, materials, blueNoise);
 
-            // Render overlay text.
+
             textRenderer.renderFonts();
 
             glfwSwapBuffers(window);
@@ -224,8 +221,11 @@ public class VolumeRaymarchLWJGL {
         shader.cleanup();
         renderer.cleanup();
         textRenderer.cleanup();
-        if (skyTexture != null) {
-            skyTexture.delete();
+        if (blueNoise != null) {
+            blueNoise.delete();
+        }
+        if (noiseTexture3D != null) {
+            noiseTexture3D.delete();
         }
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);

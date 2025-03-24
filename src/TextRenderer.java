@@ -18,25 +18,25 @@ public class TextRenderer {
     private Matrix4 orthoProjection;
     private FloatBuffer orthoBuffer;
 
-    // You can pass the window dimensions to setup the projection.
+
     public TextRenderer(int windowWidth, int windowHeight) {
         setupOrthographicProjection(windowWidth, windowHeight);
     }
 
     void setupOrthographicProjection(int width, int height) {
-        // Define the orthographic projection boundaries based on window size
+
         float left = 0.0f;
         float right = (float) width;
-        float bottom = (float) height; // Set bottom to window height
-        float top = 0.0f;              // Set top to 0
+        float bottom = (float) height;
+        float top = 0.0f;
 
-        // Create the orthographic projection matrix with flipped Y-axis
+
         orthoProjection = Matrix4.ortho2D(left, right, bottom, top);
 
-        // Allocate the FloatBuffer
+
         orthoBuffer = BufferUtils.createFloatBuffer(16);
 
-        // Populate the buffer with the matrix data
+
         orthoProjection.get(orthoBuffer);
     }
 
@@ -65,12 +65,12 @@ public class TextRenderer {
     }
 
     public void initFontQuad() {
-        // Quad vertices: positions (x,y) and texture coordinates (s,t)
+
         float[] vertices = {
-                10.0f,  10.0f,  0.0f, 0.0f,   // Bottom-left
-                266.0f, 10.0f,  1.0f, 0.0f,   // Bottom-right
-                266.0f, 266.0f, 1.0f, 1.0f,   // Top-right
-                10.0f,  266.0f, 0.0f, 1.0f    // Top-left
+                10.0f,  10.0f,  0.0f, 0.0f,
+                266.0f, 10.0f,  1.0f, 0.0f,
+                266.0f, 266.0f, 1.0f, 1.0f,
+                10.0f,  266.0f, 0.0f, 1.0f
         };
 
         textVaoID = glGenVertexArrays();
@@ -80,10 +80,10 @@ public class TextRenderer {
         glBindBuffer(GL_ARRAY_BUFFER, textVboID);
         glBufferData(GL_ARRAY_BUFFER, vertices, GL_STATIC_DRAW);
 
-        // Position attribute (location 0): two floats, stride of 4 floats, offset 0
+
         glVertexAttribPointer(0, 2, GL_FLOAT, false, 4 * Float.BYTES, 0);
         glEnableVertexAttribArray(0);
-        // Texture coordinate attribute (location 1): two floats, stride of 4 floats, offset 2 floats
+
         glVertexAttribPointer(1, 2, GL_FLOAT, false, 4 * Float.BYTES, 2 * Float.BYTES);
         glEnableVertexAttribArray(1);
 
@@ -108,10 +108,10 @@ public class TextRenderer {
         for (int y = 0; y < fontImage.getHeight(); y++) {
             for (int x = 0; x < fontImage.getWidth(); x++) {
                 int pixel = pixels[y * fontImage.getWidth() + x];
-                buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
-                buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
-                buffer.put((byte) (pixel & 0xFF));         // Blue
-                buffer.put((byte) ((pixel >> 24) & 0xFF));   // Alpha
+                buffer.put((byte) ((pixel >> 16) & 0xFF));
+                buffer.put((byte) ((pixel >> 8) & 0xFF));
+                buffer.put((byte) (pixel & 0xFF));
+                buffer.put((byte) ((pixel >> 24) & 0xFF));
             }
         }
         buffer.flip();
@@ -135,22 +135,22 @@ public class TextRenderer {
     public void renderFonts() {
         glUseProgram(textProgramID);
 
-        // Update the orthographic projection uniform
+
         orthoProjection.get(orthoBuffer);
         int projectionLoc = glGetUniformLocation(textProgramID, "projection");
         glUniformMatrix4fv(projectionLoc, false, orthoBuffer);
 
-        // Set text color (blue in this example)
+
         int textColorLoc = glGetUniformLocation(textProgramID, "textColor");
         glUniform3f(textColorLoc, 0.0f, 0.0f, 1.0f);
 
-        // Bind font texture
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, fontTextureID);
         int samplerLoc = glGetUniformLocation(textProgramID, "textTexture");
         glUniform1i(samplerLoc, 0);
 
-        // Draw the font quad
+
         glBindVertexArray(textVaoID);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         glBindVertexArray(0);

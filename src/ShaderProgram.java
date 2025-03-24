@@ -11,7 +11,7 @@ import java.util.Scanner;
 public class ShaderProgram {
     private int id;
 
-    // Constructor that loads vertex and fragment shaders by resource name (without extension)
+
     public ShaderProgram(String resourceNameWithoutExtension) {
         id = glCreateProgram();
         loadSourceAndCompileAndAttach(resourceNameWithoutExtension + "_v.glsl", GL_VERTEX_SHADER);
@@ -23,10 +23,10 @@ public class ShaderProgram {
         }
     }
 
-    // Constructor that takes a vertex shader source (or name) and a fragment shader resource name.
+
     public ShaderProgram(String vertexShaderSource, String fragmentResourceName) { // for assignment 1
         id = glCreateProgram();
-        // Here, if vertexShaderSource is just a name (no newline), compileAndAttach will load it.
+
         compileAndAttach("'vertex shader'", GL_VERTEX_SHADER, vertexShaderSource);
         loadSourceAndCompileAndAttach(fragmentResourceName, GL_FRAGMENT_SHADER);
         glLinkProgram(id);
@@ -88,7 +88,7 @@ public class ShaderProgram {
         glAttachShader(id, shaderId);
     }
 
-    // Other utility methods remain unchanged.
+
     private int compileShader(String source, int type) {
         int shaderID = glCreateShader(type);
         glShaderSource(shaderID, source);
@@ -125,7 +125,7 @@ public class ShaderProgram {
         return id;
     }
 
-    // Uniform setters
+
     public void setUniform(String name, int value) {
         int location = glGetUniformLocation(id, name);
         glUniform1i(location, value);

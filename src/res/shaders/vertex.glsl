@@ -9,17 +9,15 @@ uniform vec4 iMouse;        // (x, y, 0, 0) when pressed
 uniform vec3 iResolution;   // (width, height, depth=1)
 uniform mat4 uViewMatrix;
 
-out vec2 vUV;             // UV coordinates for texture lookups
 out vec3 vRayOrigin;      // Precomputed ray origin (with mouse offset)
 out vec3 vRayDirection;   // Precomputed initial ray direction
 
 void main() {
-    // Compute UV coordinates (from aPos.xy assumed to be in NDC)
-    vUV = aPos.xy * 0.5 + 0.5;
+
 
     // Adjust camera position using mouse Y (similar to your fragment shader)
     vec3 cameraPos = uCameraPosition;
-    cameraPos.y += (iMouse.y / iResolution.y) * 90.0;
+    //cameraPos.y += (iMouse.y / iResolution.y) * 90.0;
 
     // Compute camera basis from the view matrix
     vec3 cameraForward = normalize(-vec3(uViewMatrix[2][0], uViewMatrix[2][1], uViewMatrix[2][2]));

@@ -5,7 +5,12 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.opengl.GL20.*;
 
+
+
 public class Material {
+
+
+
     public Vector3f albedo;
     public Vector3f emissive;
     public int flags;
@@ -17,12 +22,12 @@ public class Material {
     }
 
     public static void uploadMaterialUniforms(int programID, Material[] materials) {
-        // Locate uniform locations
+
         int albedoLoc = glGetUniformLocation(programID, "uAlbedo");
         int emissiveLoc = glGetUniformLocation(programID, "uEmissive");
         int flagsLoc = glGetUniformLocation(programID, "uFlags");
 
-        // Prepare data buffers
+
         FloatBuffer albedoBuffer = BufferUtils.createFloatBuffer(materials.length * 3);
         FloatBuffer emissiveBuffer = BufferUtils.createFloatBuffer(materials.length * 3);
         IntBuffer flagsBuffer = BufferUtils.createIntBuffer(materials.length);
@@ -36,12 +41,12 @@ public class Material {
         albedoBuffer.flip();
         emissiveBuffer.flip();
         flagsBuffer.flip();
-// Example of checking uniform locations
 
 
 
 
-        // Upload to shader
+
+
         glUniform3fv(albedoLoc, albedoBuffer);
         glUniform3fv(emissiveLoc, emissiveBuffer);
         glUniform1iv(flagsLoc, flagsBuffer);
