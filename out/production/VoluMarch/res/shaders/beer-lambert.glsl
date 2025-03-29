@@ -1,78 +1,78 @@
 #version 330 core
 
-// Fragment shader outputs
+
 out vec4 fragColor;
 
 
-uniform float iTime;         // Elapsed time in seconds
-uniform sampler2D iChannel0; // For noise texture, etc.
-uniform sampler3D uNoiseTexture; // 3D noise texture
+uniform float iTime;         
+uniform sampler2D iChannel0; 
+uniform sampler3D uNoiseTexture; 
 
 
 
-// Single light uniform
-uniform vec3 uLightPosition;  // Light position in world space
-uniform vec3 uLightColor;     // Light color/intensity
-uniform float uLightRadius;   // Light's spherical influence radius
+
+uniform vec3 uLightPosition;  
+uniform vec3 uLightColor;     
+uniform float uLightRadius;   
 
 
-//--------------------------------
-//           #define(s)
-//--------------------------------
+
+
+
 #define PI 3.14159
 #define LARGE_NUMBER 1e20
 #define EPSILON 0.0001
 #define SCENE_MAX_T 900.0
 
-// Features
+
 #define CAST_SHADOW_ON_OPAQUE 1
 #define USE_BLUE_NOISE 0
-#define USE_3D_NOISE_TEXTURE 1  // New define to toggle between procedural and texture noise
+#define USE_3D_NOISE_TEXTURE 1  
 
-//--------------------------------
-//  Here is where we define we have
-//  only 1 lamp, so it's a single
-//  small lamp in the scene
-//--------------------------------
+
+
+
+
+
 #define NUM_LIGHTS 1
 
-//--------------------------------
-//light const
-//--------------------------------
+
+
+
 #define LIGHT_ATTENUATION 1.3
 
-// Debug mode uniform
-uniform int uObjectShape; // sphere, rbox, torus
+
+uniform int uObjectShape; 
 
 const float EXTINCTION_MULT = 1.0;
 
-// Reduced ambient so the scene is mostly dark, lit by the lamp
+
 const vec3 AMBIENT_LIGHT = vec3(0.01, 0.005, 0.005);
 
-// Volume
-const vec3 VOLUMETRIC_ALBEDO = vec3(0.95, 0.95, 0.95);
-const float VOLUMETRIC_ABSORPTION = 0.08;  // Reduced absorption for softer clouds
 
-// Minimum opacity for volume steps
-#define MIN_OPACITY 0.02  // Reduced for softer edges
+const vec3 VOLUMETRIC_ALBEDO = vec3(0.95, 0.95, 0.95);
+const float VOLUMETRIC_ABSORPTION = 0.08;  
+
+
+#define MIN_OPACITY 0.02  
 #define NOISE_JITTER 0.02
 #define NOISE_THRESHOLD 0.03
 
-// Volume shape
+
 #define BLEND_STRENGTH 1.75
 #define GROUND_STICK 13.
 #define NUM_OCTAVES 4
-#define NOISE 6.0  // Increased scale
-#define NOISE_HEIGHT 1.5  // Reduced height impact
+#define NOISE 6.0  
+#define NOISE_HEIGHT 1.5  
 
-// Raymarch
+
 #define MAX_STEPS 80
 #define MAX_VOLUME_STEPS 80
 #define MAX_SHADOWMARCH_STEPS 50
 #define MAX_LIGHTMARCH_STEPS 50
 #define SURFACE_DIST 0.01
 
-// Materials
+
 #define INVALID_MATERIAL_ID int(-1)
 #define LAMP_MATERIAL_ID 0
 #define DEBUG_MATERIAL_ID 1
@@ -83,7 +83,7 @@ uniform vec3 uAlbedo[NUM_MATERIALS];
 uniform vec3 uEmissive[NUM_MATERIALS];
 uniform int uFlags[NUM_MATERIALS];
 
-// Check if material is a light source
+
 bool IsLightSource(int materialID) {
     return (uFlags[materialID] & MATERIAL_IS_LIGHT_SOURCE) != 0;
 }
@@ -138,14 +138,14 @@ vec3 LinearToSRGB(vec3 rgb)
 }
 
 
-//--------------------------------------------
-//              Noise Functions
-//--------------------------------------------
+
+
+
 float hash1(float n) {
     return fract(n * 17.0 * fract(n * 0.3183099));
 }
 
-// 3D noise from : https://iquilezles.org/articles/morenoise/
+
 float noise(in vec3 x)
 {
     vec3 p = floor(x);
@@ -186,22 +186,22 @@ const mat3 m3 = mat3(
 );
 
 
-// Hash function to generate pseudo-random gradient vectors
+
 vec3 random3(vec3 p) {
     return fract(sin(vec3(dot(p, vec3(127.1, 311.7, 74.7)),
                      dot(p, vec3(269.5, 183.3, 246.1)),
                      dot(p, vec3(113.5, 271.9, 124.6)))) * 43758.5453);
 }
 
-// Classic Perlin noise function in 3D
-float perlinNoise(vec3 p) {
-    vec3 pi = floor(p); // Grid cell coordinates
-    vec3 pf = fract(p); // Local position within cell
 
-    // Smoothstep function to interpolate smoothly
+float perlinNoise(vec3 p) {
+    vec3 pi = floor(p); 
+    vec3 pf = fract(p); 
+
+    
     vec3 u = pf * pf * (3.0 - 2.0 * pf);
 
-    // Random gradient vectors at grid points
+    
     vec3 g000 = random3(pi + vec3(0.0, 0.0, 0.0));
     vec3 g100 = random3(pi + vec3(1.0, 0.0, 0.0));
     vec3 g010 = random3(pi + vec3(0.0, 1.0, 0.0));
@@ -211,7 +211,7 @@ float perlinNoise(vec3 p) {
     vec3 g011 = random3(pi + vec3(0.0, 1.0, 1.0));
     vec3 g111 = random3(pi + vec3(1.0, 1.0, 1.0));
 
-    // Compute dot products of gradient vectors with offset vectors
+    
     float n000 = dot(g000, pf - vec3(0.0, 0.0, 0.0));
     float n100 = dot(g100, pf - vec3(1.0, 0.0, 0.0));
     float n010 = dot(g010, pf - vec3(0.0, 1.0, 0.0));
@@ -221,7 +221,7 @@ float perlinNoise(vec3 p) {
     float n011 = dot(g011, pf - vec3(0.0, 1.0, 1.0));
     float n111 = dot(g111, pf - vec3(1.0, 1.0, 1.0));
 
-    // Trilinear interpolation using smoothstep values
+    
     float nx00 = mix(n000, n100, u.x);
     float nx01 = mix(n001, n101, u.x);
     float nx10 = mix(n010, n110, u.x);
@@ -233,7 +233,7 @@ float perlinNoise(vec3 p) {
     return nxyz;
 }
 
-// Worley noise function (returns the nearest and second nearest distance)
+
 vec2 worleyNoise(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
@@ -241,13 +241,13 @@ vec2 worleyNoise(vec3 p) {
     float nearest = 1.0;
     float secondNearest = 1.0;
 
-    // Loop through neighboring cells
+    
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             for (int z = -1; z <= 1; z++) {
                 vec3 neighbor = vec3(float(x), float(y), float(z));
-                vec3 point = random3(i + neighbor); // Random point in cell
-                float d = length(neighbor + point - f); // Distance to random point
+                vec3 point = random3(i + neighbor); 
+                float d = length(neighbor + point - f); 
 
                 if (d < nearest) {
                     secondNearest = nearest;
@@ -259,7 +259,7 @@ vec2 worleyNoise(vec3 p) {
         }
     }
 
-    return vec2(nearest, secondNearest); // Return both distances
+    return vec2(nearest, secondNearest); 
 }
 
 
@@ -282,35 +282,17 @@ float fbm(in vec3 x)
 }
 
 
-/*float fbm(vec3 x)
-{
-    float f = 2.0;
-    float s = 0.5;
-    float a = 0.0;
-    float b = 0.5;
 
-    for(int i = 0; i < 4; i++)
-    {
-        float n = noise(x); // Use your hash-based noise
-        vec2 worley = worleyNoise(x); // Get Worley noise
-        float worleyMix = mix(n, 1.0 - worley.x, 0.5); // Blend Perlin-style noise with Worley
-        a += b * worleyMix;
-        b *= s;
-        x = f * m3 * x;
-    }
-    return a;
-} */
 
-// Multi-Octave Worley Noise (Worley FBM)
 float worleyFBM(vec3 p) {
     float scale = 1.0;
     float weight = 0.5;
     float sum = 0.0;
     float amplitude = 1.0;
 
-    for (int i = 0; i < 5; i++) { // Increase octaves for more detail
+    for (int i = 0; i < 5; i++) { 
                                   vec2 worley = worleyNoise(p * scale);
-                                  sum += (1.0 - worley.x) * amplitude; // Invert Worley noise for cloud effect
+                                  sum += (1.0 - worley.x) * amplitude; 
                                   scale *= 2.0;
                                   amplitude *= weight;
     }
@@ -321,30 +303,30 @@ float worleyFBM(vec3 p) {
 
 
 
-//--------------------------------
-//   Fog Density in the volume
-//--------------------------------
+
+
+
 float FogDensity(vec3 p, float sdfValue)
 {
     float sdfMultiplier = (sdfValue < 0.0) ? min(abs(sdfValue), 1.0) : 0.0;
 
     #if USE_3D_NOISE_TEXTURE
-        // Sample the texture at two different scales and offsets
+        
         vec3 baseCoord = p * 0.02;
         vec3 animOffset = vec3(iTime * 0.05, iTime * 0.03, iTime * 0.04);
 
-        // First sample - larger scale
+        
         vec3 coord1 = fract(baseCoord + animOffset);
         float noise1 = texture(uNoiseTexture, coord1).r;
 
-        // Second sample - smaller scale for detail
+        
         vec3 coord2 = fract(baseCoord * 2.0 + animOffset * 1.5);
         float noise2 = texture(uNoiseTexture, coord2).r;
 
-        // Blend the two noise samples
+        
         float density = noise1 * 0.7 + noise2 * 0.3;
 
-        // Add a small bias to ensure there's always some base density
+        
         density = density * 0.8 + 0.5;
     #else
         float density = abs(fbm(p / 6.0) + 0.5);
@@ -357,12 +339,12 @@ float FogDensity(vec3 p, float sdfValue)
 
 
 
-//--------------------------------
-//  SDF shapes
-//--------------------------------
+
+
+
 
 float SdPlane(vec3 p) {
-    // Plane at y=0
+    
     return p.y;
 }
 
@@ -370,9 +352,9 @@ float SdPlane(vec3 p) {
 float SdCube(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
 {
     vec3 d = abs(p - center) - halfExtents;
-    // Maximum component-wise subtraction for distance outside the cube
+    
     float outsideDistance = length(max(d, 0.0));
-    // Minimum component-wise maximum for distance inside the cube
+    
     float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
     return outsideDistance + insideDistance - roundRadius;
 }
@@ -400,9 +382,9 @@ float SdRoundedBox(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
 
 
 
-//--------------------------------
-//   Sphere Intersection
-//--------------------------------
+
+
+
 float SphereIntersection(
 in vec3 rayOrigin,
 in vec3 rayDirection,
@@ -416,13 +398,13 @@ out vec3 normal
     float disc = dot(rayDirection, eMinusC) * dot(rayDirection, eMinusC)
     - dDotD * (dot(eMinusC, eMinusC) - sphereRadius*sphereRadius);
 
-    // no intersection
+    
     if (disc < 0.0) return -1.0;
 
     float firstIsect = (dot(-rayDirection, eMinusC) - sqrt(disc)) / dDotD;
     float t = firstIsect;
 
-    // if we are inside the sphere, pick the second intersection
+    
     if (firstIsect < EPSILON) {
         t = (dot(-rayDirection, eMinusC) + sqrt(disc)) / dDotD;
     }
@@ -431,9 +413,9 @@ out vec3 normal
     return t;
 }
 
-//--------------------------------
-//   Update Intersection Info
-//--------------------------------
+
+
+
 void UpdateIfIntersected(
 inout float tCurrent,
 in float tCandidate,
@@ -449,9 +431,9 @@ out int bestMaterialID
     }
 }
 
-//------------------------------------------------------------------
-// Volumetric and opaque raymarching functions
-//------------------------------------------------------------------
+
+
+
 
 float IntersectOpaqueScene(
 in vec3 rayOrigin,
@@ -524,7 +506,7 @@ float SdVolume(vec3 p)
     float d = min(dCube, min(dSphere, min(dTorus, dBox)));
 
     #if USE_3D_NOISE_TEXTURE
-        // Sample at two different scales for the shape deformation
+        
         vec3 baseCoord = p * 0.02;
         vec3 animOffset = vec3(
             sin(iTime * 0.15) * 0.3,
@@ -532,18 +514,18 @@ float SdVolume(vec3 p)
             sin(iTime * 0.2) * 0.25
         );
 
-        // First sample - larger scale
+        
         vec3 coord1 = fract(baseCoord + animOffset);
         float noise1 = texture(uNoiseTexture, coord1).r;
 
-        // Second sample - smaller scale for detail
+        
         vec3 coord2 = fract(baseCoord * 2.0 + animOffset * 1.5);
         float noise2 = texture(uNoiseTexture, coord2).r;
 
-        // Blend the two noise samples
+        
         float noiseValue = noise1 * 0.7 + noise2 * 0.3;
 
-        // Center the noise around 0 but with a smaller range to reduce holes
+        
         d += NOISE_HEIGHT * ((noiseValue - 0.5) * 0.7);
     #else
         vec3 fbmCoord = (p + vec3(iTime * 2.0, 0.0, iTime * 2.0)) / NOISE;
@@ -633,7 +615,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     vec3 oColor = vec3(0.0);
     float fDepth = SCENE_MAX_T;
     float oVisibility = 1.0;
-    const float marchSize = 0.2;  // Reduced from 0.6 to 0.2 for finer detail
+    const float marchSize = 0.2;  
 
     vec3 normal = vec3(0.0);
     vec3 vnormal = vec3(0.0);
@@ -695,16 +677,16 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
-//------------------------------------------------------------------
-// Main entry point: Use precomputed ray data from the vertex shader
-//------------------------------------------------------------------
+
+
+
 in vec2 vUV;
 in vec3 vRayOrigin;
 in vec3 vRayDirection;
 
 void main()
 {
-    // Use the interpolated values computed in the vertex shader.
+    
     vec2 uv = vUV;
     vec3 rayOrigin = vRayOrigin;
     vec3 rayDirection = vRayDirection;

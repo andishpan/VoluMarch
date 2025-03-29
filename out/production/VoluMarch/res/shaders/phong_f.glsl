@@ -1,7 +1,7 @@
 #version 330
 in vec4 vertexPosition;
 in vec3 color;
-in vec3 normals; // N
+in vec3 normals; 
 in vec2 uvs;
 out vec3 finalColor;
 
@@ -24,7 +24,7 @@ void main() {
     float ambientStrength = 0.1f;
     ambient = ambientStrength * lightColor;
 
-    //vec3 norm = normalize(normals);
+    
     vec3 light = normalize(lightsource - vertexPosition.xyz);
     float diff = max(dot(normals, light), 0.0);
     diffuse = diff * lightColor;

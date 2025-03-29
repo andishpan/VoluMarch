@@ -56,24 +56,7 @@ public class Renderer {
         glBindVertexArray(0);
     }
 
-    /**
-     * Renders the scene using the same uniform setup as your original code.
-     *
-     * @param elapsedTime   Elapsed time in seconds.
-     * @param width         Window width.
-     * @param height        Window height.
-     * @param mouseX        Current mouse X position.
-     * @param mouseY        Current mouse Y position.
-     * @param mouseDown     Whether the mouse button is pressed.
-     * @param cameraPos     Camera position vector.
-     * @param cameraLookAt  Camera look-at vector.
-     * @param cameraUp      Camera up vector.
-     * @param currentShape  Object shape mode.
-     * @param currentMethod Rendering method mode.
-     * @param materials     Array of Material objects.
-     * @param blueNoise    The Texture object for the sky.
-     */
-    public void render(
+        public void render(
             float elapsedTime, float width, float height,
             float mouseX, float mouseY, boolean mouseDown,
             Vector3f cameraPos, Vector3f cameraLookAt, Vector3f cameraUp,
@@ -81,7 +64,7 @@ public class Renderer {
 
         shader.bind();
 
-        // Set your existing uniforms
+
         shader.setUniform("uObjectShape", currentShape);
         shader.setUniform("uCurrentMethod", currentMethod);
         Material.uploadMaterialUniforms(shader.getID(), materials);
@@ -93,41 +76,36 @@ public class Renderer {
         float my = mouseDown ? mouseY : 0.0f;
         shader.setUniform("iMouse", mx, my, 0.0f, 0.0f);
 
-        // Bind the sky texture to texture unit 0 and set its uniform
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, blueNoise.getId());
         shader.setUniform("iChannel0", 0);
 
-        // ---------------------------------------------------------
-        // NEW SUN UNIFORMS SETUP
-        // ---------------------------------------------------------
-        // Sun direction (coming from above and slightly behind the camera)
-        //Vector3f sunDirection = new Vector3f(0.0f, 0.7f, -0.7f); // Sun coming from above and slightly behind
-       // Vector3f sunDirection = new Vector3f(0.0f, 0.2f, -1.0f); // near horizon
-        //sunDirection.normalize();
+
+
+
+
+
+
+
         Vector3f sunDirection = new Vector3f(-0.8f, 0.2f, -1.0f);
         sunDirection.normalize();
 
 
-      //  sunDirection.normalize(); // Ensure the direction is normalized
-        float sunIntensity = 1.2f; // Increase for a brighter sun
 
-        // Pass the sun uniforms to the shader.
+        float sunIntensity = 1.2f;
+
+
         shader.setUniform("uSunDirection", sunDirection.x, sunDirection.y, sunDirection.z);
         shader.setUniform("uSunIntensity", sunIntensity);
-        // ---------------------------------------------------------
 
-        // Compute a simple rotation for the camera based on the mouse X position.
-      /*  float rotationAngle = (mx / width - 0.5f) * (float)Math.PI * 0.4f;
-        float cosAngle = (float)Math.cos(rotationAngle);
-        float sinAngle = (float)Math.sin(rotationAngle);
-        Vector3f rotatedPos = new Vector3f(
-                cameraPos.x * cosAngle - cameraPos.z * sinAngle,
-                cameraPos.y,
-                cameraPos.x * sinAngle + cameraPos.z * cosAngle); */
 
-        Matrix4 viewMatrix = Matrix4.lookAt(new Vector3f(0.0f,0.0f,0.0f), cameraLookAt, cameraUp);
+
+
+        Matrix4 viewMatrix = Matrix4.lookAt(cameraPos, cameraLookAt, cameraUp);
         shader.setUniformMatrix4fv("uViewMatrix", viewMatrix.getValuesAsArray());
+
+
 
         glBindVertexArray(vaoID);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

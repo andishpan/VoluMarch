@@ -24,7 +24,7 @@ public class ShaderProgram {
     }
 
 
-    public ShaderProgram(String vertexShaderSource, String fragmentResourceName) { // for assignment 1
+    public ShaderProgram(String vertexShaderSource, String fragmentResourceName) {
         id = glCreateProgram();
 
         compileAndAttach("'vertex shader'", GL_VERTEX_SHADER, vertexShaderSource);
@@ -58,12 +58,8 @@ public class ShaderProgram {
         compileAndAttach(resourceName, type, source);
     }
 
-    /**
-     * If the provided source does not contain a newline, assume it’s only a shader name.
-     * In that case, load the actual source from the resource folder.
-     */
-    private void compileAndAttach(String resourceName, int type, String source) {
-        // Check: if source contains no newline, assume it’s just a file name.
+        private void compileAndAttach(String resourceName, int type, String source) {
+
         if (!source.contains("\n")) {
             InputStream in = getInputStreamFromResourceName(source);
             if (in == null) {

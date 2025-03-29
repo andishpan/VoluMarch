@@ -4,20 +4,20 @@
 precision mediump float;
 #endif
 
-uniform vec3  iResolution;  // (width, height, 1)
-uniform float iTime;        // Time in seconds
-uniform vec4  iMouse;       // Not used here
+uniform vec3  iResolution;  
+uniform float iTime;        
+uniform vec4  iMouse;       
 
 out vec4 fragColor;
 
-//------------------------------------
-// 1) Utility & Camera Setup
-//------------------------------------
+
+
+
 float saturate(float x) {
     return clamp(x, 0.0, 1.0);
 }
 
-// Creates a rotation matrix to "look at" a target
+
 mat3 lookAt(vec3 fw, vec3 up) {
     fw = normalize(fw);
     vec3 rt = normalize(cross(up, fw));
@@ -25,9 +25,9 @@ mat3 lookAt(vec3 fw, vec3 up) {
     return mat3(rt, tp, fw);
 }
 
-//------------------------------------
-// 2) 3D Noise (fBm)
-//------------------------------------
+
+
+
 float hash13(vec3 p) {
     p = fract(p * 0.3183099);
     p *= 17.0;
@@ -69,74 +69,74 @@ float fbm3D(vec3 p) {
     return value;
 }
 
-//------------------------------------
-// 2b) Domain Shift Function
-//------------------------------------
-// Enhanced animation with multiple time-based movements
+
+
+
+
 vec3 domainShift(vec3 pos)
 {
-    // Base scale for the cloud
+    
     float baseScale = 0.1;
 
-    // Create a gentle floating motion
-    float floatY = 0.05 * sin(iTime * 0.1);  // Vertical floating
-    float floatX = 0.03 * sin(iTime * 0.10); // Slight horizontal drift
-    float floatZ = 0.03 * cos(iTime * 0.10); // Slight forward/back drift
+    
+    float floatY = 0.05 * sin(iTime * 0.1);  
+    float floatX = 0.03 * sin(iTime * 0.10); 
+    float floatZ = 0.03 * cos(iTime * 0.10); 
 
-    // Add a subtle rotation effect
+    
     float angle = iTime * 0.1;
     mat2 rot = mat2(cos(angle), -sin(angle),
     sin(angle), cos(angle));
 
-    // Apply rotation to xz plane
+    
     vec2 rotatedXZ = rot * pos.xz;
 
-    // Combine all movements
+    
     vec3 shiftedPos = vec3(rotatedXZ.x, pos.y, rotatedXZ.y);
     shiftedPos += vec3(floatX, floatY, floatZ);
 
-    // Apply the base scale
+    
     return shiftedPos * baseScale;
 }
 
-//------------------------------------
-// 3) Multi-Octave Scattering
-//------------------------------------
-vec3 multiScatter(vec3 pos, vec3 lightDir, float density) {
-    // Base scattering parameters
-    float scatterStrength = 0.3;  // Controls overall scattering intensity
-    float phaseG = 0.2;           // Controls forward/backward scattering bias
 
-    // Calculate phase function (Henyey-Greenstein)
+
+
+vec3 multiScatter(vec3 pos, vec3 lightDir, float density) {
+    
+    float scatterStrength = 0.3;  
+    float phaseG = 0.2;           
+
+    
     float cosTheta = dot(normalize(pos), lightDir);
     float phase = (1.0 - phaseG * phaseG) / (4.0 * 3.14159 * pow(1.0 + phaseG * phaseG - 2.0 * phaseG * cosTheta, 1.5));
 
-    // Multiple scattering approximation
+    
     vec3 scatterColor = vec3(0.0);
     float totalDensity = 0.0;
 
-    // First order scattering (direct)
+    
     float directScatter = density * scatterStrength * phase;
     scatterColor += vec3(directScatter);
     totalDensity += directScatter;
 
-    // Second order scattering (indirect)
+    
     float indirectScatter = density * density * scatterStrength * 0.5 * phase;
     scatterColor += vec3(indirectScatter);
     totalDensity += indirectScatter;
 
-    // Third order scattering (ambient)
+    
     float ambientScatter = density * density * density * scatterStrength * 0.25 * phase;
     scatterColor += vec3(ambientScatter);
     totalDensity += ambientScatter;
 
-    // Normalize and return
+    
     return scatterColor / (totalDensity + 0.0001);
 }
 
-//------------------------------------
-// 4) Beer-Lambert Shadow Function
-//------------------------------------
+
+
+
 float computeLightAttenuation(vec3 startPos, vec3 lightDir)
 {
     float distMax   = 20.0;
@@ -149,10 +149,10 @@ float computeLightAttenuation(vec3 startPos, vec3 lightDir)
         if(t > distMax) break;
         vec3 pos = startPos + t*lightDir;
 
-        // Check if inside [0..10] in y
+        
         if(pos.y >= 0.0 && pos.y <= 10.0)
         {
-            // Use the same domain shift so it matches the main ray logic
+            
             float n = fbm3D(domainShift(pos));
             float density = smoothstep(0.3, 0.6, n);
             integratedDensity += density * stepSize;
@@ -160,16 +160,16 @@ float computeLightAttenuation(vec3 startPos, vec3 lightDir)
         t += stepSize;
     }
 
-    // Beer-Lambert with adjusted coefficients for multi-scatter
+    
     float absorptionCoeff = 0.5;
     float scatterCoeff = 0.3;
     float atten = exp(-(absorptionCoeff + scatterCoeff) * integratedDensity);
     return atten;
 }
 
-//------------------------------------
-// 4) Scene & Ray March
-//------------------------------------
+
+
+
 vec3 rayDirection(vec2 uv, float fovDegrees) {
     vec2 xy = uv*2.0 - 1.0;
     xy.x *= iResolution.x / iResolution.y;
@@ -190,7 +190,7 @@ vec3 renderClouds(vec3 ro, vec3 rd)
     vec3 sumColor = vec3(0.0);
     float transmittance = 1.0;
 
-    // Single directional light with slight movement
+    
     vec3 lightDir = normalize(vec3(0.3 + 0.1 * sin(iTime * 0.1), 1.0, 0.3 + 0.1 * cos(iTime * 0.1)));
 
     for(int i=0; i<512; i++){
@@ -199,22 +199,22 @@ vec3 renderClouds(vec3 ro, vec3 rd)
         vec3 pos = ro + t*rd;
 
         if(inCloudRegion(pos)) {
-            // Use our enhanced domain shift for animated clouds
+            
             float n = fbm3D(domainShift(pos));
             float density = smoothstep(0.3, 0.6, n);
 
             if(density>0.0){
-                // Calculate multi-scatter contribution
+                
                 vec3 scatterColor = multiScatter(pos, lightDir, density);
 
-                // Combine direct and scattered light
+                
                 float nl = dot(normalize(pos), lightDir);
                 float directLight = 0.7 + 0.3*saturate(nl);
 
                 float lightAtten = computeLightAttenuation(pos, lightDir);
                 directLight *= lightAtten;
 
-                // Combine direct and scattered light
+                
                 vec3 cloudColor = vec3(1.0);
                 vec3 finalColor = mix(cloudColor, scatterColor, 0.3);
 
@@ -229,24 +229,24 @@ vec3 renderClouds(vec3 ro, vec3 rd)
         t += dt;
     }
 
-    // Brighter sky background
+    
     vec3 skyColor = vec3(0.7, 0.85, 1.0);
     return sumColor + transmittance*skyColor;
 }
 
-//------------------------------------
-// 5) Main
-//------------------------------------
+
+
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
     vec2 uv = fragCoord / iResolution.xy;
 
-    // Camera
+    
     vec3 cameraPos = vec3(0.0, 2.0, 15.0);
     vec3 target    = vec3(0.0, 2.0, 0.0);
     vec3 up        = vec3(0.0, 1.0, 0.0);
 
-    // Build local frame
+    
     vec3 fw = (target - cameraPos);
     mat3 camMat = lookAt(fw, up);
 
@@ -256,13 +256,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 
     vec3 color = renderClouds(cameraPos, rd);
 
-    // Gamma
+    
     color = pow(color, vec3(0.4545));
 
     fragColor = vec4(color, 1.0);
 }
 
-// Standard entry point
+
 void main()
 {
     mainImage(fragColor, gl_FragCoord.xy);

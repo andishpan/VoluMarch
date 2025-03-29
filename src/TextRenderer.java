@@ -91,10 +91,7 @@ public class TextRenderer {
         glBindVertexArray(0);
     }
 
-    /**
-     * Generates a font texture from the provided text using AWT.
-     */
-    public void setUpFonts(String text) {
+        public void setUpFonts(String text) {
         Font font = new Font("Times New Roman", Font.BOLD, 24);
         BufferedImage fontImage = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = fontImage.createGraphics();
@@ -129,10 +126,7 @@ public class TextRenderer {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    /**
-     * Renders the font quad using the text shader program.
-     */
-    public void renderFonts() {
+        public void renderFonts() {
         glUseProgram(textProgramID);
 
 
@@ -166,7 +160,7 @@ public class TextRenderer {
         glDeleteBuffers(textVboID);
     }
 
-    // --- Utility methods for shader loading/compilation ---
+    
 
     private String loadFileAsString(String filepath) {
         StringBuilder sb = new StringBuilder();

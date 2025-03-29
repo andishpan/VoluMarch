@@ -5,6 +5,11 @@
       <root url="jar://$PROJECT_DIR$/lib/imgui-lwjgl3-1.89.0.jar!/" />
     </CLASSES>
     <JAVADOC />
+    <NATIVE>
+      <root url="file://$PROJECT_DIR$/lib" />
+      <root url="file://$PROJECT_DIR$/lib" />
+      <root url="file://$PROJECT_DIR$/lib" />
+    </NATIVE>
     <SOURCES />
   </library>
 </component>

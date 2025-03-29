@@ -148,7 +148,7 @@ public class Texture3D {
                         float ny = (float) y / height;
                         float nz = (float) z / depth;
 
-                        // Generate Perlin-Worley noise at multiple frequencies
+                        // pelin-worley
                         float noise = 0.0f;
                         float scale = 1.0f;
                         float weight = 0.5f;

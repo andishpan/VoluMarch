@@ -29,14 +29,15 @@ public class VolumeRaymarchLWJGL {
     private float deltaTime;
 
 
-    // Put the camera at (0,0,0)
-    private Vector3f cameraPosition = new Vector3f(0.0f, 40.0f, 2.0f);
+    
+    private Vector3f cameraPosition = new Vector3f(0.0f, 50.0f, 0.0f);
 
-    // Look “forward” along negative Z, so target a point like (0,0,-1)
-    private Vector3f cameraLookAt   = new Vector3f(0.0f, 0.0f, -1.0f);
 
-    // +Y is still up
-    private Vector3f cameraUp       = new Vector3f(0.0f, 5.0f, 0.0f);
+    private Vector3f cameraLookAt = new Vector3f(0.0f, -0.5f, -1.0f);
+
+
+
+    private Vector3f cameraUp       = new Vector3f(0.0f, 1.0f, 0.0f);
 
 
 
@@ -93,16 +94,8 @@ public class VolumeRaymarchLWJGL {
                 cameraPosition.x, cameraPosition.y, cameraPosition.z);
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraLookAt"),
                 cameraLookAt.x, cameraLookAt.y, cameraLookAt.z);
-        glUniform1f(glGetUniformLocation(shader.getID(), "uLensHeight"), 2.0f);
-        glUniform1f(glGetUniformLocation(shader.getID(), "uFocalDistance"), 7.0f);
+        glUniform3f(glGetUniformLocation(shader.getID(), "uCameraUp"),cameraUp.x, cameraUp.y, cameraUp.z);
 
-
-        Vector3f scaledLightColor = new Vector3f(1.0f, 1.0f, 1.0f);
-        glUniform3f(glGetUniformLocation(shader.getID(), "uLightPosition"), 0.0f, 60.0f, 0.0f);
-        glUniform3f(glGetUniformLocation(shader.getID(), "uLightColor"),
-                scaledLightColor.x, scaledLightColor.y, scaledLightColor.z);
-        glUniform1f(glGetUniformLocation(shader.getID(), "uLightRadius"), 5.0f);
-        glUseProgram(0);
 
 
         renderer = new Renderer(shader);
