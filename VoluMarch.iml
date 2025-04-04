@@ -8,7 +8,7 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="lwjgl-glfw-natives-linux" level="project" />
-    <orderEntry type="library" name="imgui-binding-1.89.0" level="project" />
     <orderEntry type="library" name="lwjgl-openxr" level="project" />
+    <orderEntry type="library" name="imgui-binding-1.89.0" level="project" />
   </component>
 </module>

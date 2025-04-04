@@ -7,9 +7,9 @@
     <JAVADOC />
     <NATIVE>
       <root url="file://$PROJECT_DIR$/lib" />
-      <root url="file://$PROJECT_DIR$/lib" />
-      <root url="file://$PROJECT_DIR$/lib" />
     </NATIVE>
-    <SOURCES />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/lib/imgui-lwjgl3-1.89.0-sources.jar!/" />
+    </SOURCES>
   </library>
 </component>

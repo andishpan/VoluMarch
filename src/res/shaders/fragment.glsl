@@ -21,7 +21,7 @@ uniform float uFocalDistance;
 
 uniform vec3 uLightPosition;  
 uniform vec3 uLightColor;     
-uniform float uLightRadius;   
+uniform float uLightRadius;
 
 
 uniform mat4 uViewMatrix;
@@ -50,8 +50,8 @@ uniform mat4 uViewMatrix;
 #define LIGHT_ATTENUATION 1.3
 
 
-uniform int uObjectShape; 
-uniform int uCurrentMethod; 
+uniform int uObjectShape;
+uniform int uCurrentMethod;
 
 
 const float EXTINCTION_MULT = 1.0;
@@ -125,7 +125,7 @@ int GetMaterialFlags(int materialID) {
 
 float GetLightAttenuation(float distanceToLight)
 {
-    
+
     return 1.0 / pow(distanceToLight, LIGHT_ATTENUATION);
 }
 
@@ -147,16 +147,16 @@ float PhaseFunction(float g, float mu) {
 
 
 float MultipleOctaveScattering(float density, float mu) {
-    float attenuation = 0.6;   
-    float contribution = 1.1;  
-    float phaseAttenuation = 0.4; 
+    float attenuation = 0.6;
+    float contribution = 1.1;
+    float phaseAttenuation = 0.4;
 
-    const float scatteringOctaves = 8.0; 
+    const float scatteringOctaves = 8.0;
 
-    float a = 1.0;  
-    float b = 1.0; 
-    float c = 1.0; 
-    float g = 0.85; 
+    float a = 1.0;
+    float b = 1.0;
+    float c = 1.0;
+    float g = 0.85;
 
     float luminance = 0.0;
 
@@ -286,7 +286,7 @@ float FogDensity(vec3 p, float sdfValue)
 
 
 float SdPlane(vec3 p) {
-    
+
     return p.y;
 }
 
@@ -294,9 +294,9 @@ float SdPlane(vec3 p) {
 float SdCube(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
 {
     vec3 d = abs(p - center) - halfExtents;
-    
+
     float outsideDistance = length(max(d, 0.0));
-    
+
     float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
     return outsideDistance + insideDistance - roundRadius;
 }
@@ -340,13 +340,13 @@ out vec3 normal
     float disc = dot(rayDirection, eMinusC) * dot(rayDirection, eMinusC)
     - dDotD * (dot(eMinusC, eMinusC) - sphereRadius*sphereRadius);
 
-    
+
     if (disc < 0.0) return -1.0;
 
     float firstIsect = (dot(-rayDirection, eMinusC) - sqrt(disc)) / dDotD;
     float t = firstIsect;
 
-    
+
     if (firstIsect < EPSILON) {
         t = (dot(-rayDirection, eMinusC) + sqrt(disc)) / dDotD;
     }
@@ -386,7 +386,7 @@ out vec3 normal
     vec3 intersectionNormal = vec3(0);
     materialID = INVALID_MATERIAL_ID;
 
-    
+
     {
         float candidate = SphereIntersection(
             rayOrigin,
@@ -411,21 +411,21 @@ out vec3 normal
 
 vec2 SphericalUV(vec3 dir)
 {
-    
+
     dir = normalize(dir);
 
-    
+
     float u = 0.5 + atan(dir.z, dir.x) / (2.0 * PI);
     float v = 0.5 - asin(dir.y) / PI;
 
-    
+
     return fract(vec2(u, v));
 }
 
 vec3 GetSkyColor(vec3 dir)
 {
     vec2 uv = SphericalUV(dir);
-    
+
     return texture(iChannel0, uv).rgb;
 }
 
@@ -438,11 +438,11 @@ vec3 GetSkyColor(vec3 dir)
 
 float SdVolume(vec3 p)
 {
-    
+
     vec3 sphereCenter = vec3(-10.0, 10.0, 0.0);
     float sphereRadius = 10.0;
 
-    vec3 torusCenter = vec3(30.0, 10.0, 0.0);
+    vec3 torusCenter = vec3(50.0, 10.0, 0.0);
     float torusR = 12.0;
     float torusr = 5.0;
 
@@ -450,13 +450,13 @@ float SdVolume(vec3 p)
     vec3 boxHalfExtents = vec3(4.0, 4.0, 4.0);
     float boxRoundRadius = 1.0;
 
-    
-    vec3 cubeCenter = vec3(-50.0, 5.0, 0.0); 
-    vec3 cubeHalfExtents = vec3(10.0, 10.0, 10.0); 
-    float cubeRoundRadius = 1.0; 
+
+    vec3 cubeCenter = vec3(-50.0, 5.0, 0.0);
+    vec3 cubeHalfExtents = vec3(10.0, 10.0, 10.0);
+    float cubeRoundRadius = 1.0;
 
 
-    
+
     float dSphere = (uObjectShape == 1)
     ? SdTorus(p, sphereCenter, sphereRadius, 3.0)
     : SdSphere(p, sphereCenter, sphereRadius);
@@ -469,14 +469,14 @@ float SdVolume(vec3 p)
     ? SdRoundedBox(p, torusCenter, vec3(torusR, torusr, torusr), 1.0)
     : SdTorus(p, torusCenter, torusR, torusr);
 
-    
+
     float dCube = SdCube(p, cubeCenter, cubeHalfExtents, cubeRoundRadius);
 
-    
-    
+
+
     float d = min(dCube, min(dSphere, min(dTorus, dBox)));
 
-    
+
     vec3 fbmCoord = (p + vec3(iTime * 2.0, 0.0, iTime * 2.0)) / NOISE;
     d += NOISE_HEIGHT * fbm(fbmCoord);
 
@@ -541,7 +541,7 @@ in vec3 rDir,
 in float maxT,
 in int numSteps,
 in float marchSize,
-   float mu 
+   float mu
 ) {
     float t = 0.0;
     float lightVis = 1.0;
@@ -577,16 +577,16 @@ void CalculateLighting(
 inout vec3 color
 )
 {
-    
+
     vec3 lightPos   = uLightPosition;
     float lightDist = length(lightPos - position);
     vec3 lightDir   = normalize(lightPos - position);
     vec3 lightColor = uLightColor * GetLightAttenuation(lightDist);
 
-    
-    float mu = dot(-normalize(reflectionDir), lightDir); 
+
+    float mu = dot(-normalize(reflectionDir), lightDir);
     #if CAST_SHADOW_ON_OPAQUE
-    
+
 
     if(uCurrentMethod == 1){
         if (!IsColorInsignificant(lightColor)) {
@@ -610,14 +610,14 @@ inout vec3 color
 
     #endif
 
-    
+
     float specular = pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
     color += lightColor * specular * GetMaterialAlbedo(materialID);
 
-    
+
     color += GetMaterialEmissive(materialID);
 
-    
+
     color += AMBIENT_LIGHT * GetMaterialAlbedo(materialID);
 }
 
@@ -639,20 +639,20 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     int  vmaterialId  = INVALID_MATERIAL_ID;
     int  materialId   = INVALID_MATERIAL_ID;
 
-    
+
     float oDepth = IntersectOpaqueScene(rayOrigin, rayDir, materialId, normal);
     if (materialId != INVALID_MATERIAL_ID) {
         fDepth = oDepth;
     }
 
-    
+
     float vDepth = IntersectVolumetric(rayOrigin, rayDir, fDepth, vmaterialId, vnormal);
 
-    
+
     if (vDepth > 0.0)
     {
-        float attenuationExponent = 2.0; 
-        float mu = 0.0; 
+        float attenuationExponent = 2.0;
+        float mu = 0.0;
         for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
             vDepth += marchSize;
             if (vDepth > oDepth) break;
@@ -666,14 +666,14 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
 
 
                 if(uCurrentMethod == 1){
-                    
+
                     float density = VOLUMETRIC_ABSORPTION * FogDensity(p, sdfValue);
 
-                    
-                    vec3 lightDir = normalize(uLightPosition - p);
-                    mu = dot(rayDir, lightDir); 
 
-                    
+                    vec3 lightDir = normalize(uLightPosition - p);
+                    mu = dot(rayDir, lightDir);
+
+
                     oVisibility *= MultipleOctaveScattering(density, mu);
                 }else if(uCurrentMethod == 0){
                     oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * FogDensity(p, sdfValue), marchSize);
@@ -685,7 +685,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
                 }
                 float marchAbsorption = prevVisibility - oVisibility;
 
-                
+
                 {
                     vec3 lightPos  = uLightPosition;
                     float lightDist= length(lightPos - p);
@@ -694,7 +694,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
 
                     if(uCurrentMethod == 1){
                         if (!IsColorInsignificant(lightCol)) {
-                            float localMu = dot(lightDir, rayDir); 
+                            float localMu = dot(lightDir, rayDir);
                             lightCol *= VolumeLightVisibility_MU(
                                 p, lightDir, lightDist,
                                 MAX_LIGHTMARCH_STEPS, marchSize * 1.4,
@@ -714,34 +714,34 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
                     vColor += marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
                 }
 
-                
+
                 vColor += marchAbsorption * VOLUMETRIC_ALBEDO * AMBIENT_LIGHT;
             }
         }
     }
 
-    
+
     if (materialId != INVALID_MATERIAL_ID)
     {
-        
+
         vec3 position = rayOrigin + rayDir * oDepth;
 
         if (IsLightSource(materialId)) {
-            
-            oColor = GetSkyColor(rayDir);
-            
+
+            oColor = vec3(0.7, 0.85, 1.0);
+
         } else {
-            
+
             vec3 reflectionDir = reflect(rayDir, normal);
 
-            
+
             CalculateLighting(position, normal, reflectionDir, materialId, oColor);
         }
     }
     else
     {
-        
-        oColor = GetSkyColor(rayDir);
+
+        oColor = vec3(0.7, 0.85, 1.0);
     }
 
     

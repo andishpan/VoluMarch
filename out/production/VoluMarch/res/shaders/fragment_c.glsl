@@ -4,14 +4,23 @@
 out vec4 fragColor;
 
 
-uniform vec3  iResolution;   
-uniform float iTime;         
-uniform vec4  iMouse;        
-uniform sampler2D iChannel0; 
+uniform vec3  iResolution;
+uniform float iTime;
+//uniform vec4  iMouse;
+uniform sampler2D iChannel0;
 
 
-uniform vec3 uSunDirection;  
-uniform float uSunIntensity; 
+uniform vec3 uSunDirection;
+uniform float uSunIntensity;
+
+uniform int uCurrentMethod;        // 0=Single,1=MOS,2=DOS,3=Dual
+uniform float uVolumetricAbsorption; // from GUI
+uniform int uObjectShape;
+uniform int uPrevShape;
+uniform float uShapeTransition; // 0.0 → old shape, 1.0 → new shape
+uniform int currentNoise;
+
+
 
 
 #define PI 3.14159
@@ -36,7 +45,7 @@ uniform float uSunIntensity;
 #define LIGHT_ATTENUATION 1.3
 
 
-uniform int uObjectShape; 
+
 
 const float EXTINCTION_MULT = 1.0;
 
@@ -50,7 +59,7 @@ const vec3 VOLUMETRIC_ALBEDO = vec3(1.0, 0.98, 0.95);
 
 
 
-const float VOLUMETRIC_ABSORPTION = 0.1;
+//const float VOLUMETRIC_ABSORPTION = 0.1;
 
 
 #define MIN_OPACITY 0.05
@@ -77,7 +86,7 @@ const float VOLUMETRIC_ABSORPTION = 0.1;
 #define DEBUG_MATERIAL_ID 1
 #define NUM_MATERIALS (LAMP_MATERIAL_ID + NUM_LIGHTS + 1)
 #define MATERIAL_IS_LIGHT_SOURCE 0x1
-#define ENABLE_SPACE_WARPING 1 
+#define ENABLE_SPACE_WARPING 1
 uniform vec3 uAlbedo[NUM_MATERIALS];
 uniform vec3 uEmissive[NUM_MATERIALS];
 uniform int uFlags[NUM_MATERIALS];
@@ -110,7 +119,7 @@ int GetMaterialFlags(int materialID) {
 
 float GetLightAttenuation(float distanceToLight)
 {
-    
+
     return 1.0 / pow(distanceToLight, LIGHT_ATTENUATION);
 }
 
@@ -146,28 +155,28 @@ float MultipleOctaveScattering(float density, float mu)
     float phaseAttenuation = 0.1;
     const float scatteringOctaves = 4.0;
 
-    
-    float a = 1.0; 
-    float b = 1.0; 
-    float c = 1.0; 
-    float g = 0.85; 
+
+    float a = 1.0;
+    float b = 1.0;
+    float c = 1.0;
+    float g = 0.85;
 
 
-    float gF = 0.6;   
-    float gB = -0.3;  
-    float mixFactor = 0.8; 
+    float gF = 0.6;
+    float gB = -0.3;
+    float mixFactor = 0.8;
 
     float luminance = 0.0;
 
     for (float i = 0.0; i < scatteringOctaves; i++) {
-        float phaseFunction = HenyeyGreenstein(0.3 * c, mu); 
+        float phaseFunction = HenyeyGreenstein(0.3 * c, mu);
 
 
-       float beers = exp(-density * EXTINCTION_MULT * a); 
+       float beers = exp(-density * EXTINCTION_MULT * a);
 
         luminance += b * phaseFunction * beers;
 
-        
+
         a *= attenuation;
         b *= contribution;
         c *= (1.0 - phaseAttenuation);
@@ -187,28 +196,28 @@ float DualScattering(float density, float mu)
     float phaseAttenuation = 0.1;
     const float scatteringOctaves = 4.0;
 
-    
-    float a = 1.0; 
-    float b = 1.0; 
-    float c = 1.0; 
-    float g = 0.85; 
+
+    float a = 1.0;
+    float b = 1.0;
+    float c = 1.0;
+    float g = 0.85;
 
 
-    float gF = 0.6;   
-    float gB = -0.3;  
-    float mixFactor = 0.8; 
+    float gF = 0.6;
+    float gB = -0.3;
+    float mixFactor = 0.8;
 
     float luminance = 0.0;
 
     for (float i = 0.0; i < scatteringOctaves; i++) {
-        
+
         float phaseFunction = DualLobeHG(mu, gF, gB, mixFactor);
 
-        float beers = exp(-density * EXTINCTION_MULT * a); 
+        float beers = exp(-density * EXTINCTION_MULT * a);
 
         luminance += b * phaseFunction * beers;
 
-        
+
         a *= attenuation;
         b *= contribution;
         c *= (1.0 - phaseAttenuation);
@@ -313,13 +322,13 @@ vec3 random3(vec3 p) {
 
 
 float perlinNoise(vec3 p) {
-    vec3 pi = floor(p); 
-    vec3 pf = fract(p); 
+    vec3 pi = floor(p);
+    vec3 pf = fract(p);
 
-    
+
     vec3 u = pf * pf * (3.0 - 2.0 * pf);
 
-    
+
     vec3 g000 = random3(pi + vec3(0.0, 0.0, 0.0));
     vec3 g100 = random3(pi + vec3(1.0, 0.0, 0.0));
     vec3 g010 = random3(pi + vec3(0.0, 1.0, 0.0));
@@ -329,7 +338,7 @@ float perlinNoise(vec3 p) {
     vec3 g011 = random3(pi + vec3(0.0, 1.0, 1.0));
     vec3 g111 = random3(pi + vec3(1.0, 1.0, 1.0));
 
-    
+
     float n000 = dot(g000, pf - vec3(0.0, 0.0, 0.0));
     float n100 = dot(g100, pf - vec3(1.0, 0.0, 0.0));
     float n010 = dot(g010, pf - vec3(0.0, 1.0, 0.0));
@@ -339,7 +348,7 @@ float perlinNoise(vec3 p) {
     float n011 = dot(g011, pf - vec3(0.0, 1.0, 1.0));
     float n111 = dot(g111, pf - vec3(1.0, 1.0, 1.0));
 
-    
+
     float nx00 = mix(n000, n100, u.x);
     float nx01 = mix(n001, n101, u.x);
     float nx10 = mix(n010, n110, u.x);
@@ -359,13 +368,13 @@ vec2 worleyNoise(vec3 p) {
     float nearest = 1.0;
     float secondNearest = 1.0;
 
-    
+
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             for (int z = -1; z <= 1; z++) {
                 vec3 neighbor = vec3(float(x), float(y), float(z));
-                vec3 point = random3(i + neighbor); 
-                float d = length(neighbor + point - f); 
+                vec3 point = random3(i + neighbor);
+                float d = length(neighbor + point - f);
 
                 if (d < nearest) {
                     secondNearest = nearest;
@@ -377,7 +386,7 @@ vec2 worleyNoise(vec3 p) {
         }
     }
 
-    return vec2(nearest, secondNearest); 
+    return vec2(nearest, secondNearest);
 }
 
 
@@ -408,9 +417,9 @@ float worleyFBM(vec3 p) {
     float sum = 0.0;
     float amplitude = 1.0;
 
-    for (int i = 0; i < 5; i++) { 
+    for (int i = 0; i < 5; i++) {
                                   vec2 worley = worleyNoise(p * scale);
-                                  sum += (1.0 - worley.x) * amplitude; 
+                                  sum += (1.0 - worley.x) * amplitude;
                                   scale *= 2.0;
                                   amplitude *= weight;
     }
@@ -440,7 +449,7 @@ float FogDensity(vec3 p, float sdfValue)
 
 
 float sdPlane(vec3 p) {
-    
+
     return p.y;
 }
 
@@ -448,9 +457,9 @@ float sdPlane(vec3 p) {
 float SdCube(vec3 p, vec3 center, vec3 halfExtents, float roundRadius)
 {
     vec3 d = abs(p - center) - halfExtents;
-    
+
     float outsideDistance = length(max(d, 0.0));
-    
+
     float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
     return outsideDistance + insideDistance - roundRadius;
 }
@@ -497,13 +506,13 @@ out vec3 normal
     float disc = dot(rayDirection, eMinusC) * dot(rayDirection, eMinusC)
     - dDotD * (dot(eMinusC, eMinusC) - sphereRadius*sphereRadius);
 
-    
+
     if (disc < 0.0) return -1.0;
 
     float firstIsect = (dot(-rayDirection, eMinusC) - sqrt(disc)) / dDotD;
     float t = firstIsect;
 
-    
+
     if (firstIsect < EPSILON) {
         t = (dot(-rayDirection, eMinusC) + sqrt(disc)) / dDotD;
     }
@@ -548,14 +557,14 @@ out vec3 normal
 
 vec2 SphericalUV(vec3 dir)
 {
-    
+
     dir = normalize(dir);
 
-    
+
     float u = 0.5 + atan(dir.z, dir.x) / (2.0 * PI);
     float v = 0.5 - asin(dir.y) / PI;
 
-    
+
     return fract(vec2(u, v));
 }
 
@@ -623,52 +632,47 @@ float opSmoothUnion( float d1, float d2, float k )
 }
 
 
+float GetShapeSDF(vec3 p, int shapeID) {
+    vec3 center1 = vec3(0.0, 20.0, -25.0);
+    float radius = 8.0;
+    vec3 cubeHalfExtents = vec3(10.0);
+    float cubeRoundRadius = 1.0;
+
+    if (shapeID == 0) {
+        vec3 offset2 = vec3(8.0, 0.0, 0.0);
+        vec3 offset3 = vec3(-8.0, 0.0, 0.0);
+        float d1 = length(p - center1) - radius;
+        float d2 = length(p - (center1 + offset2)) - radius;
+        float d3 = length(p - (center1 + offset3)) - radius;
+        float k = 2.0;
+        return opSmoothUnion(opSmoothUnion(d1, d2, k), d3, k);
+    } else if (shapeID == 1) {
+        return sdSphere(p, center1, radius);
+    } else if (shapeID == 2) {
+        return SdTorus(p, center1, 12.0, 5.0);
+    } else if (shapeID == 3) {
+        return SdCube(p, center1, cubeHalfExtents, cubeRoundRadius);
+    }
+    return 1000.0; // fallback
+}
 
 
 float SdVolume(vec3 p)
 {
-
     float scaleFactor = 1.2;
     p /= scaleFactor;
 
-    vec3 center1 = vec3(0.0, 20.0, -25.0);
+    float dPrev = GetShapeSDF(p, uPrevShape);
+    float dCurr = GetShapeSDF(p, uObjectShape);
 
-    float radius = 8.0;
+    // Blend shapes (smooth or linear)
+    float d = mix(dPrev, dCurr, smoothstep(0.0, 1.0, uShapeTransition));
 
-    float d1 = length(p - center1) - radius;
-    vec3 offset2 = vec3(8.0, 0.0, 0.0);
-    float d2 = length(p - (center1 + offset2)) - radius;
-    vec3 offset3 = vec3(-8.0, 0.0, 0.0);
-    float d3 = length(p - (center1 + offset3)) - radius;
-
-    float k = 2.0; 
-
-    
-    float cloud = opSmoothUnion(opSmoothUnion(d1, d2, k), d3, k);
-
-
-    
     vec3 fbmCoord = (p + vec3(iTime * 0.5, 0.0, iTime * 0.5)) / NOISE;
-    
-    cloud += NOISE_HEIGHT * fbm(fbmCoord);
+    d += NOISE_HEIGHT * fbm(fbmCoord);
 
-    
-    return cloud * scaleFactor;
+    return d * scaleFactor;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -710,7 +714,7 @@ in float marchSize
         if (t > maxT) break;
         vec3 p = rO + t * rDir;
         if (SdVolume(p) < 0.0) {
-            lightVis *= BeerLambert(VOLUMETRIC_ABSORPTION, marchSize);
+            lightVis *= BeerLambert(uVolumetricAbsorption, marchSize);
         }
     }
     return lightVis;
@@ -737,23 +741,23 @@ void CalculateLighting(
 inout vec3 color
 )
 {
-    
+
     vec3 lightDir   = normalize(uSunDirection);
-    
+
     vec3 lightColor = vec3(1.0, 0.95, 0.8) * uSunIntensity;
 
-    
+
     vec3 diffuse = Diffuse(normal, lightDir, GetMaterialAlbedo(materialID));
     color += lightColor * diffuse;
 
-    
+
     float specular = pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
     color += lightColor * specular * GetMaterialAlbedo(materialID);
 
-    
+
     color += GetMaterialEmissive(materialID);
 
-    
+
     color += AMBIENT_LIGHT * GetMaterialAlbedo(materialID);
 }
 
@@ -764,7 +768,7 @@ inout vec3 color
 
 
 
-vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
+vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 {
     vec3 vColor       = vec3(0.0);
     vec3 oColor       = vec3(0.0);
@@ -800,9 +804,9 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
             if (inVolume) {
                 float prevVisibility = oVisibility;
                 float fog = FogDensity(p, sdfValue);
-               
 
-                float T = BeerLambert(VOLUMETRIC_ABSORPTION * fog, marchSize);
+
+                float T = BeerLambert(uVolumetricAbsorption * fog, marchSize);
                 oVisibility *= T;
                 float marchAbsorption = prevVisibility - oVisibility;
 
@@ -820,9 +824,9 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
 
                 float powderStrength = 0.7;
                 float mu = dot(-rayDir, lightDir);
-                powderStrength *= clamp(1.0 - mu, 0.0, 1.0); 
+                powderStrength *= clamp(1.0 - mu, 0.0, 1.0);
 
-                float powder = 1.0 - exp(-VOLUMETRIC_ABSORPTION *fog * marchSize * powderStrength);
+                float powder = 1.0 - exp(-uVolumetricAbsorption *fog * marchSize * powderStrength);
 
                 if (i % 10 == 0) {
                     visibility = VolumeLightVisibility(
@@ -836,12 +840,12 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
 
 
 
-               
-              
 
 
-                
-                float blend = 0.6; 
+
+
+
+                float blend = 0.6;
                 vec3 scatterLight = mix(marchAbsorption * lightCol, powder * lightCol, blend);
 
                 vColor += scatterLight * VOLUMETRIC_ALBEDO;
@@ -861,11 +865,11 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir)
     else
     {
 
-        
+
         oColor = vec3(0.2, 0.5, 1.0);
     }
 
-
+    outVColor = vColor;
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
@@ -918,7 +922,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
                     float prevVisibility = oVisibility;
                     float fog = FogDensity(p, sdfValue);
 
-                    oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * fog, localStep);
+                    oVisibility *= BeerLambert(uVolumetricAbsorption * fog, localStep);
 
                     if (oVisibility < MIN_OPACITY) break;
 
@@ -944,7 +948,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
                     vec3 scatterContribution = marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
                     vColor += amplitude * scatterContribution;
 
-                    
+
                     vColor += amplitude * marchAbsorption * VOLUMETRIC_ALBEDO * AMBIENT_LIGHT;
                 }
             }
@@ -966,7 +970,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
     }
     else
     {
-        
+
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
@@ -988,16 +992,16 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
     int  vmaterialId  = INVALID_MATERIAL_ID;
     int  materialId   = INVALID_MATERIAL_ID;
 
-    
+
     float oDepth = IntersectOpaqueScene(rayOrigin, rayDir, materialId, normal);
     if (materialId != INVALID_MATERIAL_ID) {
         fDepth = oDepth;
     }
 
-    
+
     float vDepth = IntersectVolumetric(rayOrigin, rayDir, fDepth, vmaterialId, vnormal);
 
-    
+
     if (vDepth > 0.0)
     {
         const int NUM_SCATTER_OCTAVES = 4;
@@ -1020,7 +1024,7 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
                     float prevVisibility = oVisibility;
                     float fog = FogDensity(p, sdfValue);
 
-                    oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * fog, localStep);
+                    oVisibility *= BeerLambert(uVolumetricAbsorption * fog, localStep);
 
                     if (oVisibility < MIN_OPACITY) break;
 
@@ -1046,33 +1050,33 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
                     vec3 scatterContribution = marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
                     vColor += amplitude * scatterContribution;
 
-                    
+
                     vColor += amplitude * marchAbsorption * VOLUMETRIC_ALBEDO * AMBIENT_LIGHT;
                 }
             }
 
-            
-            amplitude *= 0.5;       
-            scatterScale *= 2.0;    
+
+            amplitude *= 0.5;
+            scatterScale *= 2.0;
         }
 
     }
 
-    
+
     if (materialId != INVALID_MATERIAL_ID)
     {
-        
+
         vec3 position = rayOrigin + rayDir * oDepth;
         vec3 reflectionDir = reflect(rayDir, normal);
         CalculateLighting(position, normal, reflectionDir, materialId, oColor);
     }
     else
     {
-        
+
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
-    
+
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
@@ -1090,16 +1094,16 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
     int  vmaterialId  = INVALID_MATERIAL_ID;
     int  materialId   = INVALID_MATERIAL_ID;
 
-    
+
     float oDepth = IntersectOpaqueScene(rayOrigin, rayDir, materialId, normal);
     if (materialId != INVALID_MATERIAL_ID) {
         fDepth = oDepth;
     }
 
-    
+
     float vDepth = IntersectVolumetric(rayOrigin, rayDir, fDepth, vmaterialId, vnormal);
 
-    
+
     if (vDepth > 0.0)
     {
         const int NUM_SCATTER_OCTAVES = 4;
@@ -1120,7 +1124,7 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
                 if (sdfValue < 0.0) {
                     float prevVisibility = oVisibility;
                     float fog = FogDensity(p, sdfValue);
-                    oVisibility *= BeerLambert(VOLUMETRIC_ABSORPTION * fog, localStep);
+                    oVisibility *= BeerLambert(uVolumetricAbsorption * fog, localStep);
 
                     if (oVisibility < MIN_OPACITY) break;
 
@@ -1134,10 +1138,10 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
                     if (!IsColorInsignificant(lightCol)) {
                         float cosTheta = dot(viewDir, lightDir);
 
-                        
-                        float gF = 0.6;   
-                        float gB = -0.3;  
-                        float mixFactor = 0.8; 
+
+                        float gF = 0.6;
+                        float gB = -0.3;
+                        float mixFactor = 0.8;
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
                                 p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
@@ -1155,33 +1159,33 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
                     vec3 scatterContribution = marchAbsorption * VOLUMETRIC_ALBEDO * lightCol;
                     vColor += amplitude * scatterContribution;
 
-                    
+
                     vColor += amplitude * marchAbsorption * VOLUMETRIC_ALBEDO * AMBIENT_LIGHT;
                 }
             }
 
-            
-            amplitude *= 0.5;       
-            scatterScale *= 2.0;    
+
+            amplitude *= 0.5;
+            scatterScale *= 2.0;
         }
 
     }
 
-    
+
     if (materialId != INVALID_MATERIAL_ID)
     {
-        
+
         vec3 position = rayOrigin + rayDir * oDepth;
         vec3 reflectionDir = reflect(rayDir, normal);
         CalculateLighting(position, normal, reflectionDir, materialId, oColor);
     }
     else
     {
-        
+
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
-    
+
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
@@ -1195,33 +1199,33 @@ in vec3 vRayDirection;
 
 void main()
 {
-
-    vec3 rayOrigin = vRayOrigin;
+    vec3 rayOrigin    = vRayOrigin;
     vec3 rayDirection = vRayDirection;
+    vec3 vColor       = vec3(0.0);
+    vec3 color;
 
-    vec3 color = vec3(0.0);
-    vec3 normal = vec3(0.0);
-    int materialID = INVALID_MATERIAL_ID;
+    // pick method
+    if (uCurrentMethod == 0) {
+        color = Render(rayOrigin, rayDirection, vColor);
+    }
+    else if (uCurrentMethod == 1) {
+        color = RenderMOS(rayOrigin, rayDirection);
+    }
+    else if (uCurrentMethod == 2) {
+        color = RenderDOS(rayOrigin, rayDirection);
+    }
+    else {
+        color = RenderDual(rayOrigin, rayDirection);
+    }
 
-    float depth = IntersectOpaqueScene(rayOrigin, rayDirection, materialID, normal);
-    color = Render(rayOrigin, rayDirection);
-
-    
     #if USE_BLUE_NOISE
-     
-    
-    float noiseVal = texture(iChannel0, gl_FragCoord.xy / iResolution.xy).r;
 
-    
-    
-    if (Luminance(color) > NOISE_THRESHOLD)
-    {
+    if (Luminance(vColor) > 0.01) {
+        float noiseVal = texture(iChannel0, gl_FragCoord.xy / iResolution.xy).r;
         color += (noiseVal - 0.5) * NOISE_JITTER;
-        
     }
     #endif
 
-    
     color = LinearToSRGB(color);
     fragColor = vec4(color, 1.0);
 }

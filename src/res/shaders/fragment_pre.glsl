@@ -19,6 +19,8 @@ uniform int uObjectShape;
 uniform int uPrevShape;
 uniform float uShapeTransition; // 0.0 → old shape, 1.0 → new shape
 uniform int currentNoise;
+uniform sampler3D uPrecomputedNoise;
+
 
 
 
@@ -172,7 +174,7 @@ float MultipleOctaveScattering(float density, float mu)
         float phaseFunction = HenyeyGreenstein(0.3 * c, mu);
 
 
-       float beers = exp(-density * EXTINCTION_MULT * a);
+        float beers = exp(-density * EXTINCTION_MULT * a);
 
         luminance += b * phaseFunction * beers;
 
@@ -254,9 +256,9 @@ vec3 LinearToSRGB(vec3 rgb)
 {
     rgb = clamp(rgb, 0.0, 1.0);
     return mix(
-        pow(rgb, vec3(1.0 / 2.4)) * 1.055 - 0.055,
-        rgb * 12.92,
-        LessThan(rgb, 0.0031308)
+    pow(rgb, vec3(1.0 / 2.4)) * 1.055 - 0.055,
+    rgb * 12.92,
+    LessThan(rgb, 0.0031308)
     );
 }
 
@@ -316,8 +318,8 @@ const mat3 m3 = mat3(
 
 vec3 random3(vec3 p) {
     return fract(sin(vec3(dot(p, vec3(127.1, 311.7, 74.7)),
-                     dot(p, vec3(269.5, 183.3, 246.1)),
-                     dot(p, vec3(113.5, 271.9, 124.6)))) * 43758.5453);
+    dot(p, vec3(269.5, 183.3, 246.1)),
+    dot(p, vec3(113.5, 271.9, 124.6)))) * 43758.5453);
 }
 
 
@@ -390,6 +392,10 @@ vec2 worleyNoise(vec3 p) {
 }
 
 
+float samplePrecomputedNoise(vec3 pos) {
+    vec3 coord = fract(pos / NOISE);  // `NOISE` should match what was used in Python
+    return texture(uPrecomputedNoise, coord).r;
+}
 
 
 float fbm(in vec3 x)
@@ -400,7 +406,7 @@ float fbm(in vec3 x)
     float b = 0.5;
     for(int i = 0; i < 4; i++)
     {
-        float n = perlinNoise(x);
+        float n = samplePrecomputedNoise(x);
         a += b * n;
         b *= s;
         x = f * m3 * x;
@@ -418,10 +424,10 @@ float worleyFBM(vec3 p) {
     float amplitude = 1.0;
 
     for (int i = 0; i < 5; i++) {
-                                  vec2 worley = worleyNoise(p * scale);
-                                  sum += (1.0 - worley.x) * amplitude;
-                                  scale *= 2.0;
-                                  amplitude *= weight;
+        vec2 worley = worleyNoise(p * scale);
+        sum += (1.0 - worley.x) * amplitude;
+        scale *= 2.0;
+        amplitude *= weight;
     }
 
     return sum;
@@ -734,10 +740,10 @@ vec3 Diffuse(in vec3 normal, in vec3 lightVec, in vec3 diffuseColor)
 
 
 void CalculateLighting(
-    vec3 position,
-    vec3 normal,
-    vec3 reflectionDir,
-    int materialID,
+vec3 position,
+vec3 normal,
+vec3 reflectionDir,
+int materialID,
 inout vec3 color
 )
 {
@@ -937,7 +943,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
 
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                            p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
                             );
                         }
 
@@ -1039,7 +1045,7 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
 
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                            p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
                             );
                         }
 
@@ -1144,7 +1150,7 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
                         float mixFactor = 0.8;
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                            p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
                             );
                         }
 
