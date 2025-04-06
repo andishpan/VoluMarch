@@ -1,14 +1,6 @@
 import imgui.ImGui;
-import imgui.ImGuiIO;
-import imgui.flag.ImGuiConfigFlags;
-import imgui.gl3.ImGuiImplGl3;
-import imgui.glfw.ImGuiImplGlfw;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
-
-import java.nio.FloatBuffer;
-
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -16,54 +8,27 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
 public class VolumeRaymarchLWJGL {
+
     private long window;
     private static final int width = 1280;
     private static final int height = 720;
 
     private ShaderProgram shader;
     private Renderer renderer;
-    private InputHandler inputHandler;
-    private TextRenderer textRenderer;
 
     private long startTime;
     private double lastFrameTime;
     private float deltaTime;
 
-    // --------------------------------------------------
-    // NEW: Cloud/lighting parameters that ImGui controls
-    // --------------------------------------------------
-    private float[] sunDirection = {-0.8f, 0.2f, -1.0f}; // X,Y,Z
-    private float   sunIntensity = 1.2f;
-    // This was a #define in the shader; we’ll make it a uniform so we can tweak it:
-    private float   volumetricAbsorption = 0.1f;
-
-    // The user can select which scattering method, etc.
-    // Let’s say we have up to 4:
-    private final String[] methodLabels = { "Single", "Multiple Octave", "Dual Octave", "Dual Lobe" };
-    private int currentMethod = 0;
-
-    private final String[] noiseLabels = { "Perlin", "Worley", "Perlin-Worley", "InigoQuilez" };
-    private int currentNoise = 0;
-    // Example shape selector:
-    private final String[] shapeLabels = { "MixedVolume", "Sphere", "Torus", "Cube" };
-
-    public int previousShape = 0;
-    public float shapeTransition = 1.0f; // Fully transitioned at start
-    private final float transitionSpeed = 1.5f; // seconds to blend
-
-    private int currentShape = 0;
-
-    // Existing camera positions
-    private Vector3f cameraPosition = new Vector3f(0.0f, 50.0f, 20.0f);
-    private Vector3f cameraLookAt   = new Vector3f(0.0f, -0.5f, -1.0f);
-    private Vector3f cameraUp       = new Vector3f(0.0f, 1.0f, 0.0f);
-
-    private ImGuiImplGlfw imGuiGlfw;
-    private ImGuiImplGl3  imGuiGl3;
 
     private Material[] materials;
     private Texture    blueNoise;
     private Texture3D  noiseTexture3D;
+
+    private boolean debugMode = true;
+
+    private RenderSettings settings = new RenderSettings();
+    private GuiController guiController;
 
     public static void main(String[] args) {
         new VolumeRaymarchLWJGL().run();
@@ -89,6 +54,13 @@ public class VolumeRaymarchLWJGL {
             throw new RuntimeException("Failed to create GLFW window");
         }
 
+        glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
+            if (action == GLFW_PRESS && key == GLFW_KEY_F1) {
+                debugMode = !debugMode;
+                System.out.println("Debug mode is now " + (debugMode ? "ON" : "OFF"));
+            }
+        });
+
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
         GL.createCapabilities();
@@ -100,50 +72,30 @@ public class VolumeRaymarchLWJGL {
         String vertexShaderPath   = "vertex.glsl";
         String fragmentShaderPath = "fragment_c.glsl";
         shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
+//gui
+        guiController = new GuiController(window, settings);
 
-        // ImGui Initialization
-        ImGui.createContext();
-        ImGuiIO io = ImGui.getIO();
-        io.addConfigFlags(ImGuiConfigFlags.DockingEnable);
-        io.getFonts().addFontDefault();
 
-        imGuiGlfw = new ImGuiImplGlfw();
-        imGuiGl3  = new ImGuiImplGl3();
-        imGuiGlfw.init(window, true);
-
-        imGuiGl3.init("#version 330");
-
-        if (!ImGui.getIO().getFonts().isBuilt()) {
-            System.err.println("❌ Font atlas not built!");
-        } else {
-            System.out.println("✅ Font atlas is ready!");
-        }
-
-        // Example: set up some initial shader uniforms
         glUseProgram(shader.getID());
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraPosition"),
-                cameraPosition.x, cameraPosition.y, cameraPosition.z);
+                settings.cameraPos.x, settings.cameraPos.y, settings.cameraPos.z);
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraLookAt"),
-                cameraLookAt.x, cameraLookAt.y, cameraLookAt.z);
+                settings.cameraLookAt.x, settings.cameraLookAt.y, settings.cameraLookAt.z);
         glUniform3f(glGetUniformLocation(shader.getID(), "uCameraUp"),
-                cameraUp.x, cameraUp.y, cameraUp.z);
-
-
+                settings.cameraUp.x, settings.cameraUp.y, settings.cameraUp.z);
         glUseProgram(0);
 
-        // Create renderer, etc.
         renderer = new Renderer(shader);
-       // inputHandler = new InputHandler(window);
+        // inputHandler = new InputHandler(window);
 
-      //  textRenderer = new TextRenderer(width, height);
-       // textRenderer.createTextShaders("C:\\RT\\VoluMarch\\src\\res\\shaders\\text_vertex.glsl",
-            //    "C:\\RT\\VoluMarch\\src\\res\\shaders\\text_fragment.glsl");
-      //  textRenderer.initFontQuad();
-       // textRenderer.setUpFonts("Volumetric Rendering Example");
+        //  textRenderer = new TextRenderer(width, height);
+        // textRenderer.createTextShaders("C:\\RT\\VoluMarch\\src\\res\\shaders\\text_vertex.glsl",
+        //    "C:\\RT\\VoluMarch\\src\\res\\shaders\\text_fragment.glsl");
+        //  textRenderer.initFontQuad();
+        // textRenderer.setUpFonts("Volumetric Rendering Example");
 
         blueNoise = new Texture("BayerDithering.png");
         noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\perlin_shader_style.bin", 64, 64, 64);
-
 
         materials = new Material[2];
         materials[0] = new Material(new Vector3f(1.0f, 1.0f, 1.0f),
@@ -151,7 +103,6 @@ public class VolumeRaymarchLWJGL {
         materials[1] = new Material(new Vector3f(0.6f, 0.6f, 0.7f),
                 new Vector3f(0.0f, 0.0f, 0.0f), 0);
         Material.uploadMaterialUniforms(shader.getID(), materials);
-
 
         glUseProgram(shader.getID());
         noiseTexture3D.bind(1);
@@ -161,7 +112,7 @@ public class VolumeRaymarchLWJGL {
         startTime = System.currentTimeMillis();
         lastFrameTime = glfwGetTime();
 
-       // setupKeyCallbacks();
+        // setupKeyCallbacks();
     }
 
     private void loop() {
@@ -170,124 +121,44 @@ public class VolumeRaymarchLWJGL {
             double currentFrameTime = glfwGetTime();
             deltaTime = (float) (currentFrameTime - lastFrameTime);
             lastFrameTime = currentFrameTime;
-
             glfwPollEvents();
-          //  handleKeyboardInput();
+            //  handleKeyboardInput();
 
 
-            //  ImGui frame
-
-            imGuiGlfw.newFrame();
-            imGuiGl3.newFrame();
-            ImGui.newFrame();
-
-
-            ImGui.begin("Cloud Control Panel");
-
-
-
-
-
-
-
-            if (ImGui.beginCombo("Shape", shapeLabels[currentShape])) {
-                for (int i = 0; i < shapeLabels.length; i++) {
-                    boolean selected = (currentShape == i);
-                    if (ImGui.selectable(shapeLabels[i], selected)) {
-                        if (!selected) {
-                            previousShape = currentShape;
-                            currentShape = i;
-                            shapeTransition = 0.0f;
-                        }
-                    }
-                    if (selected) ImGui.setItemDefaultFocus();
-                }
-                ImGui.endCombo();
+            if (debugMode) {
+                guiController.newFrame();
+                guiController.render(deltaTime);
             }
-
-            if (shapeTransition < 1.0f) {
-                shapeTransition += deltaTime * transitionSpeed;
-                shapeTransition = Math.min(shapeTransition, 1.0f);
-            }
-
-
-
-            if (ImGui.beginCombo("Scattering", methodLabels[currentMethod])) {
-                for (int i = 0; i < methodLabels.length; i++) {
-                    boolean selected = (currentMethod == i);
-                    if (ImGui.selectable(methodLabels[i], selected)) {
-                        currentMethod = i;
-                    }
-                    if (selected) {
-                        ImGui.setItemDefaultFocus();
-                    }
-                }
-                ImGui.endCombo();
-            }
-
-//noise method
-            if (ImGui.beginCombo("Noise", noiseLabels[currentNoise])) {
-                for (int i = 0; i < noiseLabels.length; i++) {
-                    boolean selected = (currentNoise == i);
-                    if (ImGui.selectable(noiseLabels[i], selected)) {
-                        currentNoise = i;
-                    }
-                    if (selected) {
-                        ImGui.setItemDefaultFocus();
-                    }
-                }
-                ImGui.endCombo();
-            }
-
-// Sliders
-            ImGui.sliderFloat3("Sun Direction", sunDirection, -1.0f, 1.0f);
-
-
-            float[] sunIntensityArr = { sunIntensity };
-            ImGui.sliderFloat("Sun Intensity", sunIntensityArr, 0.0f, 5.0f);
-            sunIntensity = sunIntensityArr[0];
-
-            float[] absorptionArr = { volumetricAbsorption };
-            ImGui.sliderFloat("Volumetric Absorption", absorptionArr, 0.0f, 2.0f);
-            volumetricAbsorption = absorptionArr[0];
-
-          //  System.out.println("WantCaptureMouse: " + ImGui.getIO().getWantCaptureMouse());
-          //  System.out.println("WantCaptureKeyboard: " + ImGui.getIO().getWantCaptureKeyboard());
-
-            ImGui.end();
-
-
 
             float elapsedTime = (System.currentTimeMillis() - startTime) * 0.001f;
            /* float mouseX = inputHandler.getMouseX();
             float mouseY = inputHandler.getMouseY();
             boolean mouseDown = inputHandler.isMouseDown(); */
-
             glViewport(0, 0, width, height);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
-            renderer.render(elapsedTime,
+           renderer.render(elapsedTime, width, height, settings, materials, blueNoise, noiseTexture3D);
+           /* renderer.render(elapsedTime,
                     width,
                     height,
-                    cameraPosition,
-                    cameraLookAt,
-                    cameraUp,
-                    currentShape,previousShape,shapeTransition,
-                    currentMethod,
-                    currentNoise,
+                    settings.getCameraPos(),
+                    settings.getCameraLookAt(),
+                    settings.getCameraUp(),
+                    settings.getCurrentShape(),settings.getPreviousShape(),settings.getShapeTransition(),
+                    settings.getCurrentMethod(),
+                    settings.getCurrentNoise(),
                     materials,
                     blueNoise,
-                    sunDirection,
-                    sunIntensity,
-                    volumetricAbsorption,noiseTexture3D
-            );
-
+                    settings.getSunDirection(),
+                    settings.getSunIntensity(),
+                    settings.getVolumetricAbsorption(),noiseTexture3D,settings.getNoiseOctaves(),settings.getNoiseHeight(),settings.getNoiseScale(),settings.getMaxSteps(),settings.getMaxVolumeSteps(),settings.getMaxShadowMarchSteps(),settings.getMaxLightMarchSteps()
+            ); */
 
             //textRenderer.renderFonts();
-            ImGui.render();
-            imGuiGl3.renderDrawData(ImGui.getDrawData());
 
+            if (debugMode) {
+                ImGui.render();
+                guiController.renderDrawData();
+            }
             glfwSwapBuffers(window);
         }
     }
@@ -308,27 +179,26 @@ public class VolumeRaymarchLWJGL {
         }
     } */
 
-  /*  private void setupKeyCallbacks() {
-        glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
-            if (action == GLFW_PRESS) {
-                switch (key) {
-                    case GLFW_KEY_M:
-                        currentShape = (currentShape + 1) % shapeLabels.length;
-                        System.out.println("Switched to shape: " + currentShape);
-                        break;
-                    case GLFW_KEY_N:
-                        currentShape = (currentShape - 1 + shapeLabels.length) % shapeLabels.length;
-                        System.out.println("Switched to shape: " + currentShape);
-                        break;
-                    case GLFW_KEY_O:
-                        currentMethod = (currentMethod + 1) % methodLabels.length;
-                        System.out.println("Switched to method: " + currentMethod);
-                        break;
-                }
-            }
-        });
-    } */
-
+    /*  private void setupKeyCallbacks() {
+          glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
+              if (action == GLFW_PRESS) {
+                  switch (key) {
+                      case GLFW_KEY_M:
+                          currentShape = (currentShape + 1) % shapeLabels.length;
+                          System.out.println("Switched to shape: " + currentShape);
+                          break;
+                      case GLFW_KEY_N:
+                          currentShape = (currentShape - 1 + shapeLabels.length) % shapeLabels.length;
+                          System.out.println("Switched to shape: " + currentShape);
+                          break;
+                      case GLFW_KEY_O:
+                          currentMethod = (currentMethod + 1) % methodLabels.length;
+                          System.out.println("Switched to method: " + currentMethod);
+                          break;
+                  }
+              }
+          });
+      } */
     private void cleanup() {
         shader.cleanup();
         renderer.cleanup();
@@ -342,6 +212,6 @@ public class VolumeRaymarchLWJGL {
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);
         glfwTerminate();
-       // glfwSetErrorCallback(null).free();
+        // glfwSetErrorCallback(null).free();
     }
 }

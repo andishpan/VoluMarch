@@ -58,7 +58,7 @@ public class ShaderProgram {
         compileAndAttach(resourceName, type, source);
     }
 
-        private void compileAndAttach(String resourceName, int type, String source) {
+    private void compileAndAttach(String resourceName, int type, String source) {
 
         if (!source.contains("\n")) {
             InputStream in = getInputStreamFromResourceName(source);

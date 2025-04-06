@@ -9,16 +9,31 @@ uniform float iTime;
 //uniform vec4  iMouse;
 uniform sampler2D iChannel0;
 
-
+//light
 uniform vec3 uSunDirection;
 uniform float uSunIntensity;
 
-uniform int uCurrentMethod;        // 0=Single,1=MOS,2=DOS,3=Dual
-uniform float uVolumetricAbsorption; // from GUI
+uniform int uCurrentMethod;
+uniform float uVolumetricAbsorption;
+
+//shape
 uniform int uObjectShape;
 uniform int uPrevShape;
-uniform float uShapeTransition; // 0.0 → old shape, 1.0 → new shape
-uniform int currentNoise;
+uniform float uShapeTransition;
+
+//noise
+uniform int uCurrentNoise;
+uniform float uNoiseScale;
+uniform float uNoiseHeight;
+uniform int uPrecomputedNoise;
+
+
+//steps
+uniform int uMaxSteps;
+uniform int uMaxVolumeSteps;
+uniform int uMaxShadowMarchSteps;
+uniform int uMaxLightMarchSteps;
+
 
 
 
@@ -26,12 +41,11 @@ uniform int currentNoise;
 #define PI 3.14159
 #define LARGE_NUMBER 1e20
 #define EPSILON 0.0001
-#define SCENE_MAX_T 900.0
+
 
 
 #define CAST_SHADOW_ON_OPAQUE 1
 #define USE_BLUE_NOISE 1
-
 
 
 
@@ -64,23 +78,21 @@ const vec3 VOLUMETRIC_ALBEDO = vec3(1.0, 0.98, 0.95);
 
 #define MIN_OPACITY 0.05
 #define NOISE_JITTER 0.02
-#define NOISE_THRESHOLD 0.03
 
 
-#define BLEND_STRENGTH 1.75
-#define GROUND_STICK 13.
-#define NUM_OCTAVES 16
-#define NOISE 10
-#define NOISE_HEIGHT 16.0
 
 
-#define MAX_STEPS 40
-#define MAX_VOLUME_STEPS 40
-#define MAX_SHADOWMARCH_STEPS 25
-#define MAX_LIGHTMARCH_STEPS 25
+#define SCENE_MAX_T 900.0
+
+
+#define NUM_SCATTER_OCTAVES 4
+
+
+
 #define SURFACE_DIST 0.03
 
-
+#define BLEND_STRENGTH 1.75
+#define NOISE_THRESHOLD 0.03
 #define INVALID_MATERIAL_ID int(-1)
 #define LAMP_MATERIAL_ID 0
 #define DEBUG_MATERIAL_ID 1
@@ -614,7 +626,7 @@ float noise3D(vec3 p) {
 float fbm3D(vec3 p) {
     float value = 0.0;
     float amp   = 0.5;
-    for(int i=0; i<5; i++){
+    for(int i=0; i<4; i++){
         value += amp * noise3D(p);
         p *= 2.01;
         amp *= 0.5;
@@ -668,8 +680,8 @@ float SdVolume(vec3 p)
     // Blend shapes (smooth or linear)
     float d = mix(dPrev, dCurr, smoothstep(0.0, 1.0, uShapeTransition));
 
-    vec3 fbmCoord = (p + vec3(iTime * 0.5, 0.0, iTime * 0.5)) / NOISE;
-    d += NOISE_HEIGHT * fbm(fbmCoord);
+    vec3 fbmCoord = (p + vec3(iTime * 0.5, 0.0, iTime * 0.5)) / uNoiseScale;
+    d += uNoiseHeight * fbm(fbmCoord);
 
     return d * scaleFactor;
 }
@@ -686,7 +698,7 @@ out vec3 normal
 ) {
     materialID = INVALID_MATERIAL_ID;
     float dO = 0.0;
-    for (int i = 0; i < MAX_STEPS; i++) {
+    for (int i = 0; i < uMaxSteps; i++) {
         vec3 p = rayOrigin + dO * rayDirection;
         float ds = SdVolume(p);
         dO += ds;
@@ -762,12 +774,6 @@ inout vec3 color
 }
 
 
-
-
-
-
-
-
 vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 {
     vec3 vColor       = vec3(0.0);
@@ -794,7 +800,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 
     if (vDepth > 0.0)
     {
-        for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
+        for (int i = 0; i < uMaxVolumeSteps; i++) {
             vDepth += marchSize;
             if (vDepth > oDepth) break;
 
@@ -805,18 +811,13 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
                 float prevVisibility = oVisibility;
                 float fog = FogDensity(p, sdfValue);
 
-
                 float T = BeerLambert(uVolumetricAbsorption * fog, marchSize);
                 oVisibility *= T;
                 float marchAbsorption = prevVisibility - oVisibility;
 
-
-
                 if (oVisibility < MIN_OPACITY) {
                     break;
                 }
-
-
 
                 vec3 lightDir = normalize(uSunDirection);
                 vec3 lightCol = vec3(1.0, 0.95, 0.8) * uSunIntensity;
@@ -831,19 +832,12 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
                 if (i % 10 == 0) {
                     visibility = VolumeLightVisibility(
                     p, lightDir, 1000.0,
-                    MAX_LIGHTMARCH_STEPS, marchSize * 1.4
+                    uMaxLightMarchSteps, marchSize * 1.4
                     );
                 }
                 if (!IsColorInsignificant(lightCol)) {
                     lightCol *= visibility;
                 }
-
-
-
-
-
-
-
 
                 float blend = 0.6;
                 vec3 scatterLight = mix(marchAbsorption * lightCol, powder * lightCol, blend);
@@ -876,8 +870,7 @@ vec3 Render(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 
 
 
-
-vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
+vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 {
     vec3 vColor       = vec3(0.0);
     vec3 oColor       = vec3(0.0);
@@ -902,7 +895,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
 
     if (vDepth > 0.0)
     {
-        const int NUM_SCATTER_OCTAVES = 4;
+
         float scatterScale = 1.0;
         float scatterStrength = 1.0;
         float amplitude = 1.0;
@@ -912,7 +905,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
             float localVDepth = vDepth;
             float localStep = marchSize / scatterScale;
 
-            for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
+            for (int i = 0; i < uMaxVolumeSteps; i++) {
                 localVDepth += localStep;
                 if (localVDepth > oDepth) break;
 
@@ -937,7 +930,7 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
 
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                                p, lightDir, 1000.0, uMaxLightMarchSteps, localStep * 1.4
                             );
                         }
 
@@ -974,12 +967,12 @@ vec3 RenderMOS(in vec3 rayOrigin, in vec3 rayDir)
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
-
+    outVColor = vColor;
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
 
-vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
+vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir , out vec3 outVColor)
 {
     vec3 vColor       = vec3(0.0);
     vec3 oColor       = vec3(0.0);
@@ -1004,7 +997,7 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
 
     if (vDepth > 0.0)
     {
-        const int NUM_SCATTER_OCTAVES = 4;
+
         float scatterScale = 1.0;
         float scatterStrength = 1.0;
         float amplitude = 1.0;
@@ -1014,7 +1007,7 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
             float localVDepth = vDepth;
             float localStep = marchSize / scatterScale;
 
-            for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
+            for (int i = 0; i < uMaxVolumeSteps; i++) {
                 localVDepth += localStep;
                 if (localVDepth > oDepth) break;
 
@@ -1039,7 +1032,7 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
 
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                                p, lightDir, 1000.0, uMaxLightMarchSteps, localStep * 1.4
                             );
                         }
 
@@ -1076,11 +1069,11 @@ vec3 RenderDOS(in vec3 rayOrigin, in vec3 rayDir)
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
-
+    outVColor = vColor;
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
 
-vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
+vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir, out vec3 outVColor)
 {
     vec3 vColor       = vec3(0.0);
     vec3 oColor       = vec3(0.0);
@@ -1106,7 +1099,7 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
 
     if (vDepth > 0.0)
     {
-        const int NUM_SCATTER_OCTAVES = 4;
+
         float scatterScale = 1.0;
         float scatterStrength = 1.0;
         float amplitude = 1.0;
@@ -1115,7 +1108,7 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
             float localVDepth = vDepth;
             float localStep = marchSize / scatterScale;
 
-            for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
+            for (int i = 0; i < uMaxVolumeSteps; i++) {
                 localVDepth += localStep;
                 if (localVDepth > oDepth) break;
 
@@ -1144,7 +1137,7 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
                         float mixFactor = 0.8;
                         if (i % 6 == 0) {
                             visibility = VolumeLightVisibility(
-                                p, lightDir, 1000.0, MAX_LIGHTMARCH_STEPS, localStep * 1.4
+                                p, lightDir, 1000.0, uMaxLightMarchSteps, localStep * 1.4
                             );
                         }
 
@@ -1185,12 +1178,9 @@ vec3 RenderDual(in vec3 rayOrigin, in vec3 rayDir)
         oColor = vec3(0.7, 0.85, 1.0);
     }
 
-
+    outVColor = vColor;
     return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
 }
-
-
-
 
 
 
@@ -1209,13 +1199,14 @@ void main()
         color = Render(rayOrigin, rayDirection, vColor);
     }
     else if (uCurrentMethod == 1) {
-        color = RenderMOS(rayOrigin, rayDirection);
+        color = RenderMOS(rayOrigin, rayDirection, vColor);
+
     }
     else if (uCurrentMethod == 2) {
-        color = RenderDOS(rayOrigin, rayDirection);
+        color = RenderDOS(rayOrigin, rayDirection, vColor);
     }
     else {
-        color = RenderDual(rayOrigin, rayDirection);
+        color = RenderDual(rayOrigin, rayDirection, vColor);
     }
 
     #if USE_BLUE_NOISE

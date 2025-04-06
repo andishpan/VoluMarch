@@ -55,35 +55,42 @@ public class Renderer {
 
 
     public void render(
-            float elapsedTime, float width, float height,
-            Vector3f cameraPos, Vector3f cameraLookAt, Vector3f cameraUp,
-            int currentShape, int previousShape, float shapeTransition,int currentMethod,int currentNoise, Material[] materials,
-            Texture blueNoise,
-            float[] sunDirection, float sunIntensity,
-            float volumetricAbsorption,Texture3D noiseTexture3D
+            float elapsedTime, float width, float height,RenderSettings settings, Material[] materials,Texture blueNoise, Texture3D noiseTexture3D
+
     ) {
         shader.bind();
 
 
-        shader.setUniform("uObjectShape", currentShape);
-        shader.setUniform("uCurrentMethod", currentMethod);
-        shader.setUniform("uCurrentNoise", currentNoise);
+        shader.setUniform("uObjectShape", settings.currentShape);
+        shader.setUniform("uCurrentMethod", settings.currentMethod);
+        shader.setUniform("uCurrentNoise", settings.currentNoise);
 
-        shader.setUniform("uPrevShape", previousShape);
-        shader.setUniform("uShapeTransition", shapeTransition);
+        shader.setUniform("uPrevShape", settings.previousShape);
+        shader.setUniform("uShapeTransition", settings.shapeTransition);
+
+        //noise
+        shader.setUniform("uNoiseScale", settings.noiseScale);
+        shader.setUniform("uNoiseHeight", settings.noiseHeight);
+
+
+        //steps
+        shader.setUniform("uMaxSteps", settings.maxSteps);
+        shader.setUniform("uMaxVolumeSteps", settings.maxVolumeSteps);
+        shader.setUniform("uMaxShadowMarchSteps", settings.maxShadowMarchSteps);
+        shader.setUniform("uMaxLightMarchSteps",settings.maxLightMarchSteps);
 
         noiseTexture3D.bind(2);
         shader.setUniform("uPrecomputedNoise", 2);
 
 
-        Material.uploadMaterialUniforms(shader.getID(), materials);
+       // Material.uploadMaterialUniforms(shader.getID(), materials);
 
-        
+
         shader.setUniform("iTime", elapsedTime);
         shader.setUniform("iResolution", width, height, 1.0f);
 
-       // float mx = mouseDown ? mouseX : 0.0f;
-       // float my = mouseDown ? mouseY : 0.0f;
+        // float mx = mouseDown ? mouseX : 0.0f;
+        // float my = mouseDown ? mouseY : 0.0f;
         //shader.setUniform("iMouse", 0.0f, 0.0f, 0.0f, 0.0f);
 
 
@@ -93,15 +100,15 @@ public class Renderer {
 
 
 
-        Vector3f sunDir = new Vector3f(sunDirection[0], sunDirection[1], sunDirection[2]).normalize();
+        Vector3f sunDir = new Vector3f(settings.sunDirection[0], settings.sunDirection[1], settings.sunDirection[2]).normalize();
         shader.setUniform("uSunDirection", sunDir.x, sunDir.y, sunDir.z);
-        shader.setUniform("uSunIntensity", sunIntensity);
+        shader.setUniform("uSunIntensity", settings.sunIntensity);
 
 
-        shader.setUniform("uVolumetricAbsorption", volumetricAbsorption);
+        shader.setUniform("uVolumetricAbsorption", settings.volumetricAbsorption);
 
 
-        Matrix4 viewMatrix = Matrix4.lookAt(cameraPos, cameraLookAt, cameraUp);
+        Matrix4 viewMatrix = Matrix4.lookAt(settings.cameraPos, settings.cameraLookAt, settings.cameraUp);
         shader.setUniformMatrix4fv("uViewMatrix", viewMatrix.getValuesAsArray());
 
 
