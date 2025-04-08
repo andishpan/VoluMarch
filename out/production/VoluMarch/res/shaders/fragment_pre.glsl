@@ -26,7 +26,8 @@ uniform float uShapeTransition;
 uniform int currentNoise;
 uniform float uNoiseScale;
 uniform float uNoiseHeight;
-uniform int uPrecomputedNoise;
+uniform sampler3D uPrecomputedNoise;
+
 
 
 //steps

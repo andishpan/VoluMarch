@@ -83,7 +83,7 @@ public class Renderer {
         shader.setUniform("uPrecomputedNoise", 2);
 
 
-       // Material.uploadMaterialUniforms(shader.getID(), materials);
+        Material.uploadMaterialUniforms(shader.getID(), materials);
 
 
         shader.setUniform("iTime", elapsedTime);

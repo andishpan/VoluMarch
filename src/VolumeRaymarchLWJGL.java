@@ -7,6 +7,8 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
+
+
 public class VolumeRaymarchLWJGL {
 
     private long window;
@@ -95,14 +97,35 @@ public class VolumeRaymarchLWJGL {
         // textRenderer.setUpFonts("Volumetric Rendering Example");
 
         blueNoise = new Texture("BayerDithering.png");
-        noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\perlin_shader_style.bin", 64, 64, 64);
+        noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\VolumeCloud.bin", 64, 64, 64);
 
-        materials = new Material[2];
-        materials[0] = new Material(new Vector3f(1.0f, 1.0f, 1.0f),
-                new Vector3f(1.0f, 1.0f, 1.0f), 1);
-        materials[1] = new Material(new Vector3f(0.6f, 0.6f, 0.7f),
-                new Vector3f(0.0f, 0.0f, 0.0f), 0);
+// light,debug,water
+        materials = new Material[3];
+
+
+        materials[0] = new Material(
+                new Vector3f(1.0f, 1.0f, 1.0f),
+                new Vector3f(1.0f, 1.0f, 1.0f),
+                1
+        );
+
+
+        materials[1] = new Material(
+                new Vector3f(0.6f, 0.6f, 0.7f),
+                new Vector3f(0.0f, 0.0f, 0.0f),
+                0
+        );
+
+
+        materials[2] = new Material(
+                new Vector3f(0.0f, 0.2f, 0.3f),
+                new Vector3f(0.02f, 0.04f, 0.05f),
+                0
+        );
+
+
         Material.uploadMaterialUniforms(shader.getID(), materials);
+
 
         glUseProgram(shader.getID());
         noiseTexture3D.bind(1);
@@ -199,6 +222,13 @@ public class VolumeRaymarchLWJGL {
               }
           });
       } */
+
+
+
+
+
+
+
     private void cleanup() {
         shader.cleanup();
         renderer.cleanup();

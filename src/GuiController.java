@@ -9,16 +9,16 @@ public class GuiController {
     private ImGuiImplGlfw imGuiGlfw;
     private ImGuiImplGl3 imGuiGl3;
 
-    // Define labels once in the GUI class
+
     private String[] shapeLabels = { "MixedVolume", "Sphere", "Torus", "Cube" };
     private String[] methodLabels = { "Single", "Multiple Octave", "Dual Octave", "Dual Lobe" };
-    private String[] noiseLabels  = { "Perlin", "Worley", "Perlin-Worley", "InigoQuilez" };
+    private String[] noiseLabels  = { "Perlin", "InigoQuilez", "Perlin-Worley", "Worley" };
 
-    // Constructor accepts the GLFW window handle and settings
+
     public GuiController(long window, RenderSettings settings) {
         this.settings = settings;
 
-        // ImGui initialization
+
         ImGui.createContext();
         ImGuiIO io = ImGui.getIO();
         io.addConfigFlags(ImGuiConfigFlags.DockingEnable);
