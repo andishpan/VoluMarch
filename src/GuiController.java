@@ -11,8 +11,8 @@ public class GuiController {
 
 
     private String[] shapeLabels = { "MixedVolume", "Sphere", "Torus", "Cube" };
-    private String[] methodLabels = { "Single", "Multiple Octave", "Dual Octave", "Dual Lobe" };
-    private String[] noiseLabels  = { "Perlin", "InigoQuilez", "Perlin-Worley", "Worley" };
+    private String[] methodLabels = { "Single", "Multiple Octave", "Backward Scattering", "Forward Scattering", "Dual Lobe" };
+    private String[] noiseLabels  = { "Perlin", "InigoQuilez", "Perlin-Worley", "Worley", "Precomputed" };
 
 
     public GuiController(long window, RenderSettings settings) {
@@ -29,11 +29,11 @@ public class GuiController {
         imGuiGlfw.init(window, true);
         imGuiGl3.init("#version 330");
 
-        if (!ImGui.getIO().getFonts().isBuilt()) {
-            System.err.println("❌ Font atlas not built!");
+      /*  if (!ImGui.getIO().getFonts().isBuilt()) {
+            System.err.println("Font atlas not built!");
         } else {
-            System.out.println("✅ Font atlas is ready!");
-        }
+            System.out.println("Font atlas is ready!");
+        } */
     }
 
     public void newFrame() {
@@ -112,8 +112,31 @@ public class GuiController {
         ImGui.sliderFloat("Noise Height", noiseHeightArr, 0.0f, 50.0f);
         settings.noiseHeight = noiseHeightArr[0];
 
+        float[] forwardScatteringArr = { settings.forwardScattering };
+        ImGui.sliderFloat("Forward Scattering", forwardScatteringArr, 0.0f, 2.0f);
+        settings.forwardScattering = forwardScatteringArr[0];
+        float[] backwardScatteringArr = { settings.backwardScattering };
+        ImGui.sliderFloat("Backward Scattering", backwardScatteringArr, 0.0f, 2.0f);
+        settings.backwardScattering = backwardScatteringArr[0];
+
+        float[] ambientLightArr = { settings.ambientLight };
+        ImGui.sliderFloat("Ambient Light", ambientLightArr, 0.0f, 10.2f);
+        settings.ambientLight = ambientLightArr[0];
+
+        float[] albedoArr = { settings.volumetricAlbedo[0],
+                settings.volumetricAlbedo[1],
+                settings.volumetricAlbedo[2] };
+        if (ImGui.colorEdit3("Volumetric Albedo", albedoArr)) {
+            settings.volumetricAlbedo[0] = albedoArr[0];
+            settings.volumetricAlbedo[1] = albedoArr[1];
+            settings.volumetricAlbedo[2] = albedoArr[2];
+        }
 
 
+        boolean useBlueNoiseArr = settings.useBlueNoise ;
+        if (ImGui.checkbox("Use Blue Noise", useBlueNoiseArr)) {
+            settings.useBlueNoise = useBlueNoiseArr;
+        }
 
         int[] maxStepsArr = { settings.maxSteps };
         ImGui.sliderInt("Max Steps", maxStepsArr, 1, 50);

@@ -65,12 +65,29 @@ public class Renderer {
         shader.setUniform("uCurrentMethod", settings.currentMethod);
         shader.setUniform("uCurrentNoise", settings.currentNoise);
 
+
         shader.setUniform("uPrevShape", settings.previousShape);
         shader.setUniform("uShapeTransition", settings.shapeTransition);
 
         //noise
         shader.setUniform("uNoiseScale", settings.noiseScale);
         shader.setUniform("uNoiseHeight", settings.noiseHeight);
+
+       //TODO:
+       // shader.setUniform("uUseBlueNoise", settings.useBlueNoise);
+
+        //scattering
+        shader.setUniform("uForwardScattering", settings.forwardScattering);
+        shader.setUniform("uBackwardScattering", settings.backwardScattering);
+
+
+
+        shader.setUniform("uAmbientLight", settings.ambientLight);
+
+        Vector3f volumetricAlbedo = new Vector3f(settings.volumetricAlbedo[0], settings.volumetricAlbedo[1], settings.volumetricAlbedo[2]);
+        shader.setUniform("uVolumetricAlbedo", volumetricAlbedo.x, volumetricAlbedo.y, volumetricAlbedo.z);
+
+
 
 
         //steps
@@ -86,12 +103,12 @@ public class Renderer {
         Material.uploadMaterialUniforms(shader.getID(), materials);
 
 
-        shader.setUniform("iTime", elapsedTime);
-        shader.setUniform("iResolution", width, height, 1.0f);
+        shader.setUniform("uTime", elapsedTime);
+        shader.setUniform("uResolution", width, height, 1.0f);
 
         // float mx = mouseDown ? mouseX : 0.0f;
         // float my = mouseDown ? mouseY : 0.0f;
-        //shader.setUniform("iMouse", 0.0f, 0.0f, 0.0f, 0.0f);
+        //shader.setUniform("uMouse", 0.0f, 0.0f, 0.0f, 0.0f);
 
 
         glActiveTexture(GL_TEXTURE0);

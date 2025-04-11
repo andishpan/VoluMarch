@@ -11,12 +11,18 @@ public class RenderSettings {
     public float[] sunDirection = { -0.8f, 0.2f, -1.0f };
     public float   sunIntensity = 1.2f;
     public float   volumetricAbsorption = 0.1f;
+    public boolean useBlueNoise = true;
 
     // noise
     public float noiseScale = 10.0f;
     public float noiseHeight = 16.0f;
     public int currentNoise = 0;
 
+    //scattering
+    public float forwardScattering = 0.6f;
+    public float backwardScattering = -0.6f;
+    public float ambientLight = 0.1f;
+    public float[] volumetricAlbedo = {1.0f, 0.98f, 0.95f};
 
     // shape
     public int currentShape = 0;
@@ -26,6 +32,7 @@ public class RenderSettings {
 
     // methods
     public int currentMethod = 0;
+
 
     // steps
     public int maxSteps = 44;
