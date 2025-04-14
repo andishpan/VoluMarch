@@ -22,6 +22,10 @@ public class VolumeRaymarchLWJGL {
     private double lastFrameTime;
     private float deltaTime;
 
+    private int lastNoiseIndex = -1;
+    private ShaderProgram[] noiseShaders;
+
+
 
     private Material[] materials;
     private Texture    blueNoise;
@@ -73,19 +77,19 @@ public class VolumeRaymarchLWJGL {
 
         String vertexShaderPath   = "vertex.glsl";
         String fragmentShaderPath = "fragment_c.glsl";
-        shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
+       // shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
+
+
 //gui
         guiController = new GuiController(window, settings);
 
 
-        glUseProgram(shader.getID());
-        glUniform3f(glGetUniformLocation(shader.getID(), "uCameraPosition"),
-                settings.cameraPos.x, settings.cameraPos.y, settings.cameraPos.z);
-        glUniform3f(glGetUniformLocation(shader.getID(), "uCameraLookAt"),
-                settings.cameraLookAt.x, settings.cameraLookAt.y, settings.cameraLookAt.z);
-        glUniform3f(glGetUniformLocation(shader.getID(), "uCameraUp"),
-                settings.cameraUp.x, settings.cameraUp.y, settings.cameraUp.z);
-        glUseProgram(0);
+        initShaders();
+
+
+        lastNoiseIndex = settings.getCurrentNoise();
+        shader = noiseShaders[lastNoiseIndex];
+
 
         renderer = new Renderer(shader);
         // inputHandler = new InputHandler(window);
@@ -127,16 +131,35 @@ public class VolumeRaymarchLWJGL {
         Material.uploadMaterialUniforms(shader.getID(), materials);
 
 
-        glUseProgram(shader.getID());
+
+        /*glUseProgram(shader.getID());
         noiseTexture3D.bind(1);
-        glUniform1i(glGetUniformLocation(shader.getID(), "uNoiseTexture"), 1);
-        glUseProgram(0);
+        glUseProgram(0); */
 
         startTime = System.currentTimeMillis();
         lastFrameTime = glfwGetTime();
 
         // setupKeyCallbacks();
     }
+
+    private void initShaders() {
+        String[] noiseVariants = {
+                "noise_perlin.glsl",
+                "noise_inigo.glsl",
+                "noise_perlin_worley.glsl",
+                "noise_worley.glsl",
+                "noise_precomputed.glsl",
+                "noise_fbm3D.glsl"
+        };
+
+        noiseShaders = new ShaderProgram[noiseVariants.length];
+
+        for (int i = 0; i < noiseVariants.length; i++) {
+            String[] fragments = { "fragment_base.glsl", noiseVariants[i] };
+            noiseShaders[i] = new ShaderProgram("vertex.glsl", fragments);
+        }
+    }
+
 
     private void loop() {
 
@@ -159,7 +182,17 @@ public class VolumeRaymarchLWJGL {
             boolean mouseDown = inputHandler.isMouseDown(); */
             glViewport(0, 0, width, height);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-           renderer.render(elapsedTime, width, height, settings, materials, blueNoise, noiseTexture3D);
+
+            int currentNoise = settings.getCurrentNoise();
+            if (currentNoise != lastNoiseIndex) {
+                lastNoiseIndex = currentNoise;
+                ShaderProgram currentShader = noiseShaders[currentNoise];
+                renderer.setShader(currentShader);
+
+
+            }
+
+            renderer.render(elapsedTime, width, height, settings, materials, blueNoise, noiseTexture3D);
            /* renderer.render(elapsedTime,
                     width,
                     height,

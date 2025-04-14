@@ -10,6 +10,7 @@ public class GuiController {
     private ImGuiImplGl3 imGuiGl3;
 
 
+
     private String[] shapeLabels = { "MixedVolume", "Sphere", "Torus", "Cube" };
     private String[] methodLabels = { "Single", "Multiple Octave", "Backward Scattering", "Forward Scattering", "Dual Lobe" };
     private String[] noiseLabels  = { "Perlin", "InigoQuilez", "Perlin-Worley", "Worley", "Precomputed" };

@@ -16,7 +16,7 @@ public class RenderSettings {
     // noise
     public float noiseScale = 10.0f;
     public float noiseHeight = 16.0f;
-    public int currentNoise = 0;
+    public int currentNoise = 4;
 
     //scattering
     public float forwardScattering = 0.6f;
@@ -39,5 +39,14 @@ public class RenderSettings {
     public int maxVolumeSteps = 44;
     public int maxShadowMarchSteps = 12;
     public int maxLightMarchSteps = 20;
+
+
+
+
+
+    public int getCurrentNoise() {
+        return currentNoise;
+    }
+
 
 }

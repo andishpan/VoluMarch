@@ -20,6 +20,11 @@ public class Renderer {
         createQuad();
     }
 
+    public void setShader(ShaderProgram shader) {
+        this.shader = shader;
+    }
+
+
     private void createQuad() {
         float[] vertices = {
                 -1.0f, -1.0f, 0.0f,
@@ -59,6 +64,14 @@ public class Renderer {
 
     ) {
         shader.bind();
+
+        shader.setUniform("uCameraPosition",settings.cameraPos.x, settings.cameraPos.y, settings.cameraPos.z);
+        shader.setUniform("uCameraLookAt",settings.cameraLookAt.x, settings.cameraLookAt.y, settings.cameraLookAt.z);
+        shader.setUniform("uCameraUp",settings.cameraUp.x, settings.cameraUp.y, settings.cameraUp.z);
+
+
+
+
 
 
         shader.setUniform("uObjectShape", settings.currentShape);

@@ -23,7 +23,7 @@ void main() {
     //cameraPos.y += 50.0;
 
     vec3 cameraRight   = normalize(vec3(1.0, 0.0, 0.0));
-    
+
     float aspectRatio = uResolution.x / uResolution.y;
     float lensWidth = aspectRatio;
 

@@ -23,6 +23,34 @@ public class ShaderProgram {
         }
     }
 
+    public ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
+        id = glCreateProgram();
+
+
+        loadSourceAndCompileAndAttach(vertexShaderFile, GL_VERTEX_SHADER);
+
+
+        StringBuilder combinedFragment = new StringBuilder();
+        for (String part : fragmentShaderParts) {
+            InputStream in = getInputStreamFromResourceName(part);
+            if (in == null) {
+                throw new RuntimeException("Shader part not found: " + part);
+            }
+            try (Scanner scanner = new Scanner(in)) {
+                combinedFragment.append(scanner.useDelimiter("\\A").next()).append("\n");
+            }
+        }
+
+        compileAndAttach("fragment_combined", GL_FRAGMENT_SHADER, combinedFragment.toString());
+
+        
+        glLinkProgram(id);
+        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
+            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
+        }
+    }
+
+
 
     public ShaderProgram(String vertexShaderSource, String fragmentResourceName) {
         id = glCreateProgram();
@@ -52,11 +80,14 @@ public class ShaderProgram {
             return;
         }
         String source;
+        //TODO Scattering and Absorption
         try (Scanner in = new Scanner(inputStreamFromResourceName)) {
             source = in.useDelimiter("\\A").next();
         }
         compileAndAttach(resourceName, type, source);
     }
+
+
 
     private void compileAndAttach(String resourceName, int type, String source) {
 
