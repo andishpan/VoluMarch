@@ -12,7 +12,7 @@ public class GuiController {
 
 
     private String[] shapeLabels = { "MixedVolume", "Sphere", "Torus", "Cube" };
-    private String[] methodLabels = { "Single", "Multiple Octave", "Backward Scattering", "Forward Scattering", "Dual Lobe" };
+    private String[] methodLabels = { "Beer-Lambert", "Powder", "Multiple Octave", "Forward Scattering", "Backward Scattering","Dual Lobe" };
     private String[] noiseLabels  = { "Perlin", "InigoQuilez", "Perlin-Worley", "Worley", "Precomputed" };
 
 

@@ -1210,7 +1210,6 @@ void main(){
     }
     else if (uCurrentMethod == 1) {
         color = raymarchMOS(rayOrigin, rayDirection, vColor);
-
     }
     else if (uCurrentMethod == 2) {
         color = raymarchBackwardScattering(rayOrigin, rayDirection, vColor);

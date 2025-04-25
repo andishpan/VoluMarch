@@ -6,9 +6,14 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Scanner;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class ShaderProgram {
+
+
+    private final List<Integer> shaderIds = new ArrayList<>();
+
     private int id;
 
 
@@ -23,7 +28,7 @@ public class ShaderProgram {
         }
     }
 
-    public ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
+    /*public ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
         id = glCreateProgram();
 
 
@@ -48,6 +53,131 @@ public class ShaderProgram {
         if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
             throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
         }
+    } */
+
+   /* public ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
+        id = glCreateProgram();
+
+
+        loadSourceAndCompileAndAttach(vertexShaderFile, GL_VERTEX_SHADER);
+
+
+        StringBuilder combinedFragment = new StringBuilder();
+        for (String part : fragmentShaderParts) {
+            InputStream in = getInputStreamFromResourceName(part);
+            if (in == null) throw new RuntimeException("Shader part not found: " + part);
+
+            String rawSource = new Scanner(in).useDelimiter("\\A").next();
+            String preprocessed = preprocessShader(rawSource);
+            combinedFragment.append(preprocessed).append("\n");
+        }
+
+
+        compileAndAttach("fragment_combined", GL_FRAGMENT_SHADER, combinedFragment.toString());
+
+
+
+        glLinkProgram(id);
+        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
+            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
+        }
+    } */
+
+   /* public ShaderProgram(String vertexPath, String... fragmentPaths) {
+        id = glCreateProgram();
+        if (id == 0) throw new IllegalStateException("glCreateProgram failed");
+
+        compileAndAttach(vertexPath, GL_VERTEX_SHADER);
+
+        for (String frag : fragmentPaths) {
+            compileAndAttach(frag, GL_FRAGMENT_SHADER);
+        }
+
+        glLinkProgram(id);
+        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
+            throw new RuntimeException("Program link failed:\n"
+                    + glGetProgramInfoLog(id));
+        }
+
+
+      /*  for (int sid : shaderIds) {
+            glDetachShader(id, sid);
+            glDeleteShader(sid);
+        }
+        shaderIds.clear();
+    }  */
+
+    public ShaderProgram(String vertexPath, String... fragmentPaths) {
+        id = glCreateProgram();
+        if (id == 0) throw new IllegalStateException("glCreateProgram failed");
+
+        compileAndAttach(vertexPath, GL_VERTEX_SHADER);
+
+
+        StringBuilder combinedFragment = new StringBuilder();
+        for (String path : fragmentPaths) {
+            String fragmentSource = loadResource("/res/shaders/" + path);
+            combinedFragment.append(fragmentSource).append("\n");
+        }
+
+        String fullFragment = preprocess(combinedFragment.toString());
+
+        compileAndAttach("combined_fragment", GL_FRAGMENT_SHADER, fullFragment);
+
+        glLinkProgram(id);
+        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
+            throw new RuntimeException("Program link failed:\n"
+                    + glGetProgramInfoLog(id));
+        }
+
+        for (int sid : shaderIds) {
+            glDetachShader(id, sid);
+            glDeleteShader(sid);
+        }
+        shaderIds.clear();
+    }
+
+
+    private void compileAndAttach(String fileName, int type) {
+        int sid = glCreateShader(type);
+        if (sid == 0) throw new IllegalStateException("glCreateShader failed");
+
+        String source = loadResource("/res/shaders/" + fileName);
+        glShaderSource(sid, preprocess(source));
+        glCompileShader(sid);
+
+        if (glGetShaderi(sid, GL_COMPILE_STATUS) == GL_FALSE) {
+            String what = (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT");
+            throw new RuntimeException(what + " shader '" + fileName +
+                    "' failed to compile:\n" + glGetShaderInfoLog(sid));
+        }
+
+        glAttachShader(id, sid);
+        shaderIds.add(sid);
+    }
+
+    private static String loadResource(String path) {
+        InputStream in = ShaderProgram.class.getResourceAsStream(path);
+        if (in == null) throw new RuntimeException("Shader file not found: " + path);
+        try (Scanner s = new Scanner(in, StandardCharsets.UTF_8)) {
+            return s.useDelimiter("\\A").next();
+        }
+    }
+
+
+    private static String preprocess(String src) {
+        StringBuilder out = new StringBuilder();
+        Scanner sc = new Scanner(src);
+        while (sc.hasNextLine()) {
+            String line = sc.nextLine();
+            if (line.trim().startsWith("#include")) {
+                String inc = line.split("\"")[1];
+                out.append(preprocess(loadResource("/res/shaders/" + inc)));
+            } else {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
     }
 
 
@@ -139,6 +269,41 @@ public class ShaderProgram {
         }
         return sb.toString();
     }
+
+
+    private String preprocessShader(String source) {
+        return preprocessShaderRecursive(source, new HashSet<>());
+    }
+
+    private String preprocessShaderRecursive(String source, Set<String> includedFiles) {
+        StringBuilder processed = new StringBuilder();
+        Scanner scanner = new Scanner(source);
+
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine();
+
+            if (line.trim().startsWith("#include")) {
+                String includePath = line.split("\"")[1];
+                if (includedFiles.contains(includePath)) continue;
+
+                includedFiles.add(includePath);
+
+                InputStream in = getInputStreamFromResourceName(includePath);
+                if (in == null) {
+                    throw new RuntimeException("Failed to find include: " + includePath);
+                }
+
+                String includeContent = new Scanner(in).useDelimiter("\\A").next();
+                processed.append(preprocessShaderRecursive(includeContent, includedFiles)).append("\n");
+            } else {
+                processed.append(line).append("\n");
+            }
+        }
+
+        return processed.toString();
+    }
+
+
 
     public void bind() {
         glUseProgram(id);

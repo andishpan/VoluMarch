@@ -1,6 +1,9 @@
 import imgui.ImGui;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
+
+import java.io.IOException;
+
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -16,6 +19,7 @@ public class VolumeRaymarchLWJGL {
     private static final int height = 720;
 
     private ShaderProgram shader;
+    private ShaderProgram methodsShader;
     private Renderer renderer;
 
     private long startTime;
@@ -23,7 +27,15 @@ public class VolumeRaymarchLWJGL {
     private float deltaTime;
 
     private int lastNoiseIndex = -1;
+    private int lastMethodIndex = -1;
     private ShaderProgram[] noiseShaders;
+    private ShaderProgram[] methodShaders;
+    private boolean testing = false;
+
+   private FrameBench bench = new FrameBench();
+    private GpuTimer gpuTimer;
+
+    ShaderProgram[][] combinedShaders;
 
 
 
@@ -36,11 +48,11 @@ public class VolumeRaymarchLWJGL {
     private RenderSettings settings = new RenderSettings();
     private GuiController guiController;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         new VolumeRaymarchLWJGL().run();
     }
 
-    public void run() {
+    public void run() throws IOException {
         init();
         loop();
         cleanup();
@@ -70,6 +82,7 @@ public class VolumeRaymarchLWJGL {
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
         GL.createCapabilities();
+        gpuTimer = new GpuTimer();
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -87,8 +100,10 @@ public class VolumeRaymarchLWJGL {
         initShaders();
 
 
-        lastNoiseIndex = settings.getCurrentNoise();
-        shader = noiseShaders[lastNoiseIndex];
+        int m = settings.getCurrentMethod();
+        int n = settings.getCurrentNoise();
+        shader = combinedShaders[m][n];
+
 
 
         renderer = new Renderer(shader);
@@ -152,18 +167,53 @@ public class VolumeRaymarchLWJGL {
                 "noise_fbm3D.glsl"
         };
 
-        noiseShaders = new ShaderProgram[noiseVariants.length];
+        String[] methodVariants = {
+                "beer_lambert.glsl",
+                "powder.glsl",
+                "MOS.glsl",
+                "forward.glsl",
+                "backward.glsl",
+                "dual_lobe.glsl"
+        };
 
-        for (int i = 0; i < noiseVariants.length; i++) {
-            String[] fragments = { "fragment_base.glsl", noiseVariants[i] };
-            noiseShaders[i] = new ShaderProgram("vertex.glsl", fragments);
+         combinedShaders = new ShaderProgram[methodVariants.length][noiseVariants.length];
+
+        for (int m = 0; m < methodVariants.length; ++m) {
+            for (int n = 0; n < noiseVariants.length; ++n) {
+                combinedShaders[m][n] = new ShaderProgram(
+                        "vertex.glsl",
+                        "fragment_base.glsl",
+                        noiseVariants[n],
+                        methodVariants[m]
+                );
+            }
         }
+
+
+        int m0 = settings.getCurrentMethod();
+        int n0 = settings.getCurrentNoise();
+        shader = combinedShaders[m0][n0];
     }
 
 
-    private void loop() {
+
+    private void loop() throws IOException {
+
+
+        if(testing){
+            bench.setOnExitRequest(() -> glfwSetWindowShouldClose(window, true));
+            SystemInfoLogger.log("testResults\\system_info.txt");
+        }
+
+
 
         while (!glfwWindowShouldClose(window)) {
+            double start = System.nanoTime();
+            // Start timing
+            if(testing){
+                gpuTimer.begin();
+            }
+
             double currentFrameTime = glfwGetTime();
             deltaTime = (float) (currentFrameTime - lastFrameTime);
             lastFrameTime = currentFrameTime;
@@ -183,16 +233,22 @@ public class VolumeRaymarchLWJGL {
             glViewport(0, 0, width, height);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            int currentNoise = settings.getCurrentNoise();
-            if (currentNoise != lastNoiseIndex) {
-                lastNoiseIndex = currentNoise;
-                ShaderProgram currentShader = noiseShaders[currentNoise];
-                renderer.setShader(currentShader);
+            int m = settings.getCurrentMethod();
+            int n = settings.getCurrentNoise();
 
-
+            ShaderProgram want = combinedShaders[m][n];
+            if (want != shader) {
+                shader = want;
+                renderer.setShader(shader);
             }
 
+
             renderer.render(elapsedTime, width, height, settings, materials, blueNoise, noiseTexture3D);
+            if(testing){
+                gpuTimer.end();
+            }
+
+
            /* renderer.render(elapsedTime,
                     width,
                     height,
@@ -216,7 +272,18 @@ public class VolumeRaymarchLWJGL {
                 guiController.renderDrawData();
             }
             glfwSwapBuffers(window);
+            if(testing){
+                double gpuMs = gpuTimer.getElapsedTimeMs();
+                System.out.printf("GPU render time: %.3f ms\n", gpuMs);
+
+                bench.tick(gpuMs);
+            }
+
         }
+        if(testing){
+            bench.saveCsv("perlin.csv");
+        }
+
     }
 
    /* private void handleKeyboardInput() {
