@@ -12,6 +12,8 @@ uniform vec3 uVolumetricAlbedo;
 
 uniform int uCurrentMethod;
 uniform float uVolumetricAbsorption;
+uniform float uVolumetricScattering;
+uniform float uPhaseG;
 
 //shape
 uniform int uObjectShape;
@@ -22,7 +24,7 @@ uniform float uShapeTransition;
 uniform int uCurrentNoise;
 uniform float uNoiseScale;
 uniform float uNoiseHeight;
-
+uniform int uTilePeriod;
 
 
 //steps
@@ -30,11 +32,16 @@ uniform int uMaxSteps;
 uniform int uMaxVolumeSteps;
 uniform int uMaxShadowMarchSteps;
 uniform int uMaxLightMarchSteps;
+uniform float uStepSize;
+uniform float uShadowStepSize;
+
 uniform samplerCube uEnvironmentMap;
 
 //scattering
 uniform float uForwardScattering;
 uniform float uBackwardScattering;
+uniform float uPowderStrength;
+uniform float uBlendFactor;
 
 #define WATER_MATERIAL_ID 2
 #define PI 3.14159
@@ -44,7 +51,7 @@ uniform float uBackwardScattering;
 
 const float EXTINCTION_MULT = 1.0;
 
-#define MIN_OPACITY 0.05
+#define MIN_OPACITY 0.05 // 0.01, 0.002
 #define NOISE_JITTER 0.02
 #define SCENE_MAX_T 900.0
 #define NUM_SCATTER_OCTAVES 4

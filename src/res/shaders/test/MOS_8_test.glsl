@@ -1,6 +1,5 @@
 
-#ifndef RAYMARCH_MOS_BOUNCE_DEFINED
-#define RAYMARCH_MOS_BOUNCE_DEFINED
+
 
 #ifndef COMMON_RAYMARCH_GLSL
 #include "common/common_raymarch.glsl"
@@ -51,10 +50,10 @@ inout int shadowCtr)
 vec3 raymarch(vec3 rayOrigin, vec3 rayDir,
 out vec3 outVolCol,
 out int  outPrimary, out int outShadow,
-out int  outSdf,     out int outBounce)
+out int  outSdf)
 {
 
-    int primaryCtr=0, shadowCtr=0, sdfCtr=0, bounceCtr=0;
+    int primaryCtr=0, shadowCtr=0, sdfCtr=0;
 
 
     vec3  volCol=vec3(0.0), surfCol=vec3(0.0);
@@ -123,9 +122,9 @@ out int  outSdf,     out int outBounce)
 
 
 
-            if(stepExt > 0.0 && sigmaS > 0.0){
-                bounceCtr++;
-            }
+            //if(stepExt > 0.0 && sigmaS > 0.0){
+            //    bounceCtr++;
+          //  }
 
 
             vec3 scatter = sunCol * (sigmaS * phase * lightVis);
@@ -146,7 +145,7 @@ out int  outSdf,     out int outBounce)
     outPrimary = primaryCtr;
     outShadow  = shadowCtr;
     outSdf     = sdfCtr;
-    outBounce  = bounceCtr;
+
     return clamp(volCol,0.0,1.0)+trans*surfCol;
 }
 

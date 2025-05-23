@@ -8,13 +8,13 @@
 vec3 raymarch(vec3 rayOrigin, vec3 rayDir,
 out vec3 outVolCol,out float outTransmittance,
 out int outPrimary, out int outShadow,
-out int outSdf, out int outBounce)
+out int outSdf)
 {
 
     int primarySteps = 0;
     int shadowSteps  = 0;
     int sdfSteps     = 0;
-    int bounceSteps  = 0;
+
 
 
     vec3  volumeColor   = vec3(0.0);
@@ -98,9 +98,7 @@ out int outSdf, out int outBounce)
                 float phase = HenyeyGreenstein(mu, uBackwardScattering);
 
 
-                if(stepExt > 0.0 && sigmaS > 0.0){
-                    bounceSteps++;
-                }
+
 
 
 
@@ -128,7 +126,7 @@ out int outSdf, out int outBounce)
     outPrimary = primarySteps;
     outShadow  = shadowSteps;
     outSdf     = sdfSteps;
-    outBounce  = bounceSteps;
+
 
     return clamp(volumeColor, 0.0, 1.0) + transmittance * surfaceColor;
 }

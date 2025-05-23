@@ -84,35 +84,69 @@ float getFresnel(vec3 N, vec3 V, float F0) {
 }
 
 
-void getLighting(vec3 position, vec3 normal, vec3 reflectionDir, vec3 rayDir, int materialID, inout vec3 color) {
-    vec3 lightDir   = normalize(uSunDirection);
-    vec3 lightColor = vec3(1.0, 0.95, 0.8) * uSunIntensity;
+struct Material {
+    vec3  albedo;
+    vec3  emissive;
+    int   flags;
+};
+Material fetchMaterial(int id) {
+    return Material(uAlbedo[id],
+    uEmissive[id],
+    uFlags[id]);
+}
 
-    vec3 diffuseLight = diffuseLight(normal, lightDir, GetMaterialAlbedo(materialID));
-    color += lightColor * diffuseLight;
+/* hemisphere‑uniform ambient taken from a pre‑set uniform */
+vec3  AMBIENT = ambientColor;
 
-    float specular = pow(max(dot(reflectionDir, lightDir), 0.0), 8.0);
-    color += lightColor * specular * GetMaterialAlbedo(materialID);
+/* GGX / Schlick–Fresnel roughness 0.3 */
+float phongGGX(vec3 n, vec3 v, vec3 l, float rough) {
+    vec3 h  = normalize(v + l);
+    float ndl = clamp(dot(n, l), 0.0, 1.0);
+    float ndv = clamp(dot(n, v), 0.0, 1.0);
+    float ndh = clamp(dot(n, h), 0.0, 1.0);
+    float vdh = clamp(dot(v, h), 0.0, 1.0);
 
-    color += GetMaterialEmissive(materialID);
-    color += ambientColor * GetMaterialAlbedo(materialID);
+    float m2 = rough * rough;
+    float d  = m2 / (PI * pow(ndh * ndh * (m2 - 1.0) + 1.0, 2.0));
+    float k  = m2 * 0.5;
+    float g  = ndl / (ndl * (1.0 - k) + k) *
+    ndv / (ndv * (1.0 - k) + k);
+    float f  = pow(1.0 - vdh, 5.0);
+    return d * g * mix(1.0, 0.04, f);
+}
 
-    if (materialID == WATER_MATERIAL_ID) {
+void getLighting(in vec3  P, in vec3  N, in vec3  V, int   matID, inout vec3 outColor){
+    Material m       = fetchMaterial(matID);
+    vec3     L       = normalize(uSunDirection);
+    vec3     sunCol  = vec3(1.0, 0.95, 0.8) * uSunIntensity;
 
-        vec3 waterNormal = getWaterNormal(position);
-        vec3 reflectedDir = reflect(rayDir, waterNormal);
-        vec3 refractedColor = vec3(0.02, 0.1, 0.15);
+    //diffuse and specular
+    float  ndl       = clamp(dot(N, L), 0.0, 1.0);
+    vec3   diffuse   = m.albedo * ndl;
+    vec3   specular  = phongGGX(N, V, L, 0.3) * m.albedo;
+
+    outColor += sunCol * (diffuse + specular);
+
+    //ambient and emmisive
+    outColor += AMBIENT * m.albedo + m.emissive;
+
+    //water
+    if (matID == WATER_MATERIAL_ID) {
+        vec3 waterN      = getWaterNormal(P);
+        vec3 reflDir     = reflect(-V, waterN);
+        vec3 refrTint    = vec3(0.02, 0.1, 0.15);
+
+        float F0         = 0.02;
+        float fresnel    = getFresnel(waterN, V, F0);
+
+        vec3 reflCol     = skyColor(reflDir);
+        vec3 base        = mix(refrTint, reflCol, fresnel);
 
 
-        vec3 reflectedColor = skyColor(reflectedDir);
+        base += refrTint * 0.3 * (1.0 - fresnel);
 
-        float F0 = 0.02;
-        float fresnel = getFresnel(waterNormal, -rayDir, F0);
-
-        color += mix(refractedColor, reflectedColor, fresnel);
-
-
-        color +=  fresnel * 0.5;
+        outColor += base;
     }
 }
+
 #endif

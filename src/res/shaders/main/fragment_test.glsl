@@ -37,8 +37,7 @@ vec3 raymarch
 vec3  rayOrigin,          vec3  rayDir,
 out   vec3  outVolColor,out float outTransmittance,
 out   int   outPrimary,   out   int outShadow,
-out   int   outSdf,       out   int outBounce
-);
+out   int   outSdf);
 #define RAYMARCH_DECL
 #endif
 
@@ -56,13 +55,13 @@ void main()
     /* counters returned from raymarch() ---------------------------------- */
     vec3 volumeColor;
     float transmittance;
-    int  primarySteps, shadowSteps, sdfSteps, bounceSteps;
+    int  primarySteps, shadowSteps, sdfSteps;
 
     /* integrate the volume ---------------------------------------------- */
     vec3 hdrColor = raymarch(vRayOrigin, vRayDirection,
     volumeColor,transmittance,
     primarySteps, shadowSteps,
-    sdfSteps,     bounceSteps);
+    sdfSteps);
 
     float extinction = 1.0 - clamp(transmittance, 0.0, 1.0);
     fragCloudMask = extinction > 0.01 ? 1.0 : 0.0;  // binary mask
@@ -82,6 +81,5 @@ void main()
     fragColor  = vec4(LinearToSRGB(hdrColor), 1.0);
     fragSteps  = uvec4(primarySteps,
     shadowSteps,
-    sdfSteps,
-    bounceSteps);     // <— *real* bounce counter
+    sdfSteps,0.0);
 }
