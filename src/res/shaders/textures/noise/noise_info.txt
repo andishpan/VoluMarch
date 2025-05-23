@@ -1,0 +1,4 @@
+Each .bin file:
+Format: raw 32-bit floats (float32), laid out as X-major (then Y, then Z).
+Dimensions: 256×256×256.
+perlin is 128

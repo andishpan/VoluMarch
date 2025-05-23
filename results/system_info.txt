@@ -1,10 +1,10 @@
-Benchmark Timestamp: 2025-04-17 12:30:36
+Benchmark Timestamp: 2025-05-23 12:07:40
 
-GPU Vendor:   NVIDIA Corporation
-GPU render.Renderer: NVIDIA GeForce GTX 1660 Ti/PCIe/SSE2
-GL Version:   3.3.0 NVIDIA 536.23
+GPU Vendor:   Intel
+GPU Rendering.Renderer: Intel(R) Iris(R) Plus Graphics
+GL Version:   3.3.0 - Build 27.20.100.9168
 
 OS:           Windows 10 10.0
 Java Version: 17.0.2
-CPU Cores:    6
-Max JVM Memory: 4080 MB
+CPU Cores:    8
+Max JVM Memory: 4040 MB

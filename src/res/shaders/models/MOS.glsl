@@ -1,130 +1,160 @@
-#ifndef RAYMARCH_DEFINED
-#define RAYMARCH_DEFINED
 
-vec3 raymarch(vec3 rayOrigin, vec3 rayDir, out vec3 outVColor) {
-    vec3 vColor       = vec3(0.0);
-    vec3 oColor       = vec3(0.0);
-    float finalDepth      = SCENE_MAX_T;
-    float oVisibility = 1.0;
-    const float marchSize = 0.6;
+#ifndef RAYMARCH_MOS_DEFINED
+#define RAYMARCH_MOS_DEFINED
 
-    vec3 normal       = vec3(0.0);
-    vec3 vnormal      = vec3(0.0);
-    int  vmaterialId  = INVALID_MATERIAL_ID;
+#ifndef COMMON_RAYMARCH_GLSL
+#include "common/common_raymarch.glsl"
+#endif
+
+
+const int   NUM_OCTAVES     = 4;
+const float OCTAVE_SCALES[NUM_OCTAVES]  = float[](1.0, 0.5, 0.25, 0.125);
+const float OCTAVE_ECC[NUM_OCTAVES]     = float[](0.6, 0.2, 0.05, 0.01);
+const float OCTAVE_WEIGHTS[NUM_OCTAVES] = float[](0.5, 0.25, 0.125, 0.125);
+
+
+const float OCTAVE_CDF[NUM_OCTAVES] = float[](0.5, 0.75, 0.875, 1.0);
+
+
+float hash11(float p) {
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
+int selectOctave(float seed) {
+    float r = hash11(seed);
+    for (int i = 0; i < NUM_OCTAVES; ++i) {
+        if (r < OCTAVE_CDF[i]) return i;
+    }
+    return NUM_OCTAVES - 1;
+}
+
+
+
+vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outvolumeColor) {
+    vec3 volumeColor       = vec3(0.0);
+    vec3 surfaceColor       = vec3(0.0);
+    float nearestHitT  = SCENE_MAX_T;
+    float viewTransmittance = 1.0;
+   // const float uStepSize = 0.6;
+
+    vec3 surfaceNormal       = vec3(0.0);
     int  materialId   = INVALID_MATERIAL_ID;
 
 
-    float t = 1e20;
+    float closestT = 1e20;
     vec3 intersectionNormal = vec3(0.0);
-    materialId = WATER_MATERIAL_ID;
-
-
-
-    if (rayDir.y != 0.0) {
-        float tPlane = -rayOrigin.y / rayDir.y;
-        if (tPlane > EPSILON && tPlane < t) {
-            t = tPlane;
-            intersectionNormal = vec3(0.0, 1.0, 0.0);
+    bool hitOpaque = false;
+    float waterT;
+    vec3  waterNormal;
+    if (intersectWaterPlane(rayOrigin, rayDirection, waterT, waterNormal)) {
+        if (waterT < closestT) {
+            closestT = waterT;
+            intersectionNormal = waterNormal;
             materialId = WATER_MATERIAL_ID;
+            hitOpaque = true;
         }
     }
 
-
-    normal = intersectionNormal;
-    float opaqueDepth = t;
-    if (materialId != INVALID_MATERIAL_ID) {
-        finalDepth = opaqueDepth;
+    float opaqueDepth = closestT;
+    if (hitOpaque) {
+        surfaceNormal      = intersectionNormal;
+        nearestHitT  = opaqueDepth;
     }
 
 
     float volumetricDepth = 0.0;
-    for (int i = 0; i < uMaxSteps; i++) {
-        vec3 p = rayOrigin + volumetricDepth * rayDir;
+    for (int i = 0; i < uMaxSteps; ++i) {
+        vec3 p = rayOrigin + volumetricDepth * rayDirection;
         float distance = getVolume(p);
-        if (distance < SURFACE_DIST || volumetricDepth > finalDepth) break;
+        if (distance < SURFACE_DIST || volumetricDepth > nearestHitT) break;
         volumetricDepth += distance;
     }
 
 
-    if (volumetricDepth < finalDepth){
+    if (volumetricDepth < nearestHitT) {
+        for (int i = 0; i < uMaxVolumeSteps; ++i) {
+            volumetricDepth += uStepSize;
+            if (volumetricDepth > nearestHitT) break;
 
-        float scatterScale = 1.0;
-        float scatterStrength = 1.0;
-        float amplitude = 1.0;
-        float visibility = 0.0;
+            vec3 p = rayOrigin + rayDirection * volumetricDepth;
+            float sdfValue = getVolume(p);
 
-        for (int octave = 0; octave < NUM_SCATTER_OCTAVES; octave++) {
-            float localVDepth = volumetricDepth;
-            float localStep = marchSize / scatterScale;
+            if (sdfValue < 0.0) {
+                float density = getDensity(p, sdfValue);
 
-            for (int i = 0; i < uMaxVolumeSteps; i++) {
-                localVDepth += localStep;
-                if (localVDepth > opaqueDepth) break;
+                vec3 lightDir   = normalize(uSunDirection);
+                vec3 lightColor = vec3(1.0, 0.95, 0.8) * uSunIntensity;
+                vec3 ambient    = ambientColor * 0.5;
 
-                vec3 p = rayOrigin + rayDir * localVDepth;
-                float sdfValue = getVolume(p);
-                if (sdfValue < 0.0) {
-                    float prevVisibility = oVisibility;
-                    float fog = getDensity(p, sdfValue);
+                int octave;
+                if (NUM_OCTAVES <= 2) {
+                    //  loop over all octaves
+                    for (octave = 0; octave < NUM_OCTAVES; ++octave) {
+                        float scale   = OCTAVE_SCALES[octave];
+                        float g       = OCTAVE_ECC[octave];
+                        float weight  = OCTAVE_WEIGHTS[octave];
 
-                    oVisibility *= BeerLambert(uVolumetricAbsorption * fog, localStep);
+                        float sigmaT = uVolumetricAbsorption * density * scale;
+                        vec3  sigmaS = uVolumetricAlbedo    * density * scale;
 
-                    if (oVisibility < MIN_OPACITY) break;
+                        float stepTransmittance  = exp(-sigmaT * uStepSize);
+                        float lightAbsorption = (1.0 - stepTransmittance) * viewTransmittance;
+                        viewTransmittance *= stepTransmittance;
+                        if (viewTransmittance < MIN_OPACITY) break;
 
-                    float marchAbsorption = prevVisibility - oVisibility;
+                        float cosTheta = dot(-rayDirection, lightDir);
+                        float phase    = HenyeyGreenstein(cosTheta, g);
 
-                    vec3 viewDir = -rayDir;
-                    vec3 lightDir = normalize(uSunDirection);
-                    vec3 lightCol = vec3(1.0, 0.95, 0.8) * uSunIntensity;
-
-                    if (!isColorTooDark(lightCol)) {
-                        float mu = dot(viewDir, lightDir);
-
-                        //  if (i % 6 == 0) {
-                        visibility = 1.0;
-                        float lightT = 0.0;
-                        for (int j = 0; j < uMaxLightMarchSteps; j++) {
-                            lightT += marchSize * 1.4;
-                            vec3 currentLightPoint = p + lightDir * lightT;
-                            if (getVolume(currentLightPoint) < 0.0) {
-                                visibility *= BeerLambert(uVolumetricAbsorption, marchSize * 1.4);
-                                if (visibility < 0.01) break;
-                            }
-                        }
-                        // }
-
-                        float scatter = MultipleOctaveScattering(fog, mu);
-                        lightCol *= visibility * scatter;
+                        float shadowTransmittance = shadowMarchMOS(p, lightDir, uShadowStepSize, uMaxLightMarchSteps,scale);
+                        vec3 scatter  = lightColor * (sigmaS * phase * shadowTransmittance);
+                        volumeColor += weight * scatter * lightAbsorption;
+                        volumeColor += ambient * lightAbsorption;
                     }
+                } else {
+                    // stochastic roulette selection
+                    octave = selectOctave(volumetricDepth + p.x + p.y + p.z);
 
-                    vec3 scatterContribution = marchAbsorption * uVolumetricAlbedo * lightCol;
-                    vColor += amplitude * scatterContribution;
+                    float scale   = OCTAVE_SCALES[octave];
+                    float g       = OCTAVE_ECC[octave];
+                    float weight  = OCTAVE_WEIGHTS[octave] * float(NUM_OCTAVES);
 
+                    float sigmaT = uVolumetricAbsorption * density * scale;
+                    vec3  sigmaS = uVolumetricAlbedo    * density * scale;
 
-                    vColor += amplitude * marchAbsorption * uVolumetricAlbedo * ambientColor;
+                    float stepTransmittance  = exp(-sigmaT * uStepSize);
+                    float lightAbsorption = (1.0 - stepTransmittance) * viewTransmittance;
+                    viewTransmittance *= stepTransmittance;
+                    if (viewTransmittance < MIN_OPACITY) continue;
+
+                    float cosTheta = dot(-rayDirection, lightDir);
+                    float phase    = HenyeyGreenstein(cosTheta, g);
+
+                    float shadowTransmittance = shadowMarchMOS(p, lightDir,
+                    uShadowStepSize,
+                    uMaxLightMarchSteps,
+                    scale);
+                    vec3 scatter  = lightColor * (sigmaS * phase * shadowTransmittance);
+                    volumeColor += weight * scatter * lightAbsorption;
+                    volumeColor += ambient * lightAbsorption;
                 }
             }
-
-            amplitude *= 0.5;
-            scatterScale *= 2.0;
         }
-
     }
 
 
-    if (materialId != INVALID_MATERIAL_ID){
+    if (hitOpaque && materialId != INVALID_MATERIAL_ID) {
+        vec3 position      = rayOrigin + rayDirection * opaqueDepth;
 
-        vec3 position = rayOrigin + rayDir * opaqueDepth;
-        vec3 reflectionDir = reflect(rayDir, normal);
-        getLighting(position, normal, reflectionDir, rayDir,materialId, oColor);
-    }
-    else {
-
-        oColor = vec3(0.7, 0.85, 1.0);
+        getLighting(position, surfaceNormal, -rayDirection, materialId, surfaceColor);
+    } else {
+        surfaceColor = vec3(0.7, 0.85, 1.0);
     }
 
-    outVColor = vColor;
-    return clamp(vColor, 0.0, 1.0) + oVisibility * oColor;
+    outvolumeColor = volumeColor;
+    return clamp(volumeColor, 0.0, 1.0) + viewTransmittance * surfaceColor;
 }
 
 #endif
