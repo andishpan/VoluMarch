@@ -1,62 +1,96 @@
 #ifndef RENDER_SETTINGS_GLSL
 #define RENDER_SETTINGS_GLSL
-uniform vec3  uResolution;
-uniform float uTime;
-uniform sampler2D iChannel0;
+//#extension GL_NV_uniform_buffer_std430_layout : enable
+layout(location = 0) out vec4  fragColor;
+layout(binding = 0) uniform sampler2D  iChannel0;
+layout(binding = 2) uniform sampler3D  uPrecomputedNoise;
+layout(binding = 3) uniform samplerCube uEnvironmentMap;
+layout(std430, binding = 0) buffer Counters {
+    uint volume;
+    uint shadow;
+    uint sdf;
+    uint entryCount;
+};
+
+layout(std140, binding = 1) uniform Settings {
+
+    vec3 uCameraPosition;  float _pad0;
+    vec3 uCameraLookAt;  float _pad1;
+    vec3 uCameraUp;  float _pad2;
+
+    vec3 uResolution;  float uTime;
 
 //light
-uniform vec3 uSunDirection;
-uniform float uSunIntensity;
-uniform vec3 uAmbientLight;
-uniform vec3 uVolumetricAlbedo;
+    vec3 uSunDirection;  float uSunIntensity;
+    vec3 uSunColour; float uAmbientLight;
 
-uniform int uCurrentMethod;
-uniform float uVolumetricAbsorption;
-uniform float uVolumetricScattering;
-uniform float uPhaseG;
+
+    int uCurrentMethod;
+    float uVolumetricAbsorption;
+    float uVolumetricScattering;
+    float uPhaseG;
 
 //shape
-uniform int uObjectShape;
-uniform int uPrevShape;
-uniform float uShapeTransition;
+    int uObjectShape;
+    int uPrevShape;
+    float uShapeTransition;
 
 //noise
-uniform int uCurrentNoise;
-uniform float uNoiseScale;
-uniform float uNoiseHeight;
-uniform int uTilePeriod;
+    int uCurrentNoise;
+    float uNoiseScale;
+    float uNoiseHeight;
+    int uTilePeriod;
+    int uNoiseOctaves;
+    int uNumMosOctaves;
+    float _pad_afterNumMos;
 
 
 //steps
-uniform int uMaxSteps;
-uniform int uMaxVolumeSteps;
-uniform int uMaxShadowMarchSteps;
-uniform int uMaxLightMarchSteps;
-uniform float uStepSize;
-uniform float uShadowStepSize;
+    int uMaxSteps;
+    int uMaxVolumeSteps;
+    int uMaxShadowSteps;
+    float uStepSize;
+    float uShadowStepSize;
 
-uniform samplerCube uEnvironmentMap;
 
 //scattering
-uniform float uForwardScattering;
-uniform float uBackwardScattering;
-uniform float uPowderStrength;
-uniform float uBlendFactor;
+    float uForwardScattering;
+    float uBackwardScattering;
+    float uPowderStrength;
+    float sdfBlendRadius;
+
+    bool uUseBlueNoise;
+
+    float uTransmittanceThreshold;
+    float uSDFHitThreshold;
+    float uNoiseJitter;
+    float uMaxRayDistance;
+};
+
+
+
+
+const vec3  kRayleigh  = vec3(5.8e-3, 1.35e-2, 3.31e-2) * 50.0;// 1/λ⁴ in RGB order
+// Mie is almost gray, scale later by user strength
+const vec3  kMie   = vec3(1.0);
+
+vec3 ambientColor;
+
 
 #define WATER_MATERIAL_ID 2
 #define PI 3.14159
 #define EPSILON 0.0001
-#define USE_BLUE_NOISE 0
+#define USE_BLUE_NOISE 1
 #define NUM_LIGHTS 0
 
 const float EXTINCTION_MULT = 1.0;
 
-#define MIN_OPACITY 0.05 // 0.01, 0.002
-#define NOISE_JITTER 0.02
-#define SCENE_MAX_T 900.0
+
+
 #define NUM_SCATTER_OCTAVES 4
-#define SURFACE_DIST 0.03
+
 #define INVALID_MATERIAL_ID int(-1)
 #define NUM_MATERIALS 3
+
 
 #endif

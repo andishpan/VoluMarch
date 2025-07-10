@@ -11,5 +11,6 @@
     <orderEntry type="library" name="lwjgl-openxr" level="project" />
     <orderEntry type="library" name="imgui-binding-1.89.0" level="project" />
     <orderEntry type="library" name="lwjgl-tinyexr-natives-windows" level="project" />
+    <orderEntry type="library" name="json" level="project" />
   </component>
 </module>

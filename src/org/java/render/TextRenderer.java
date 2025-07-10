@@ -6,6 +6,7 @@ import org.java.utility.Matrix4;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -71,10 +72,10 @@ public class TextRenderer {
     public void initFontQuad() {
 
         float[] vertices = {
-                10.0f,  10.0f,  0.0f, 0.0f,
-                266.0f, 10.0f,  1.0f, 0.0f,
+                10.0f, 10.0f, 0.0f, 0.0f,
+                266.0f, 10.0f, 1.0f, 0.0f,
                 266.0f, 266.0f, 1.0f, 1.0f,
-                10.0f,  266.0f, 0.0f, 1.0f
+                10.0f, 266.0f, 0.0f, 1.0f
         };
 
         textVaoID = glGenVertexArrays();
@@ -95,7 +96,7 @@ public class TextRenderer {
         glBindVertexArray(0);
     }
 
-        public void setUpFonts(String text) {
+    public void setUpFonts(String text) {
         Font font = new Font("Times New Roman", Font.BOLD, 24);
         BufferedImage fontImage = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = fontImage.createGraphics();
@@ -130,7 +131,7 @@ public class TextRenderer {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-        public void renderFonts() {
+    public void renderFonts() {
         glUseProgram(textProgramID);
 
 
@@ -164,7 +165,6 @@ public class TextRenderer {
         glDeleteBuffers(textVboID);
     }
 
-    
 
     private String loadFileAsString(String filepath) {
         StringBuilder sb = new StringBuilder();

@@ -10,16 +10,41 @@ public class Vector3f {
     }
 
 
-    public Vector3f abs() {
-        return new Vector3f(Math.abs(this.x), Math.abs(this.y), Math.abs(this.z));
-    }
-
     public Vector3f(Vector3f start) {
         this.x = start.x;
         this.y = start.y;
         this.z = start.z;
     }
 
+    public static Vector3f intToVector3f(int color) {
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+        return new Vector3f(r, g, b);
+    }
+
+    public static int vector3fToInt(Vector3f color) {
+        int r = Math.min(255, (int) (color.x * 255));
+        int g = Math.min(255, (int) (color.y * 255));
+        int b = Math.min(255, (int) (color.z * 255));
+        return (r << 16) | (g << 8) | b;
+    }
+
+    public static Vector3f lerp(Vector3f start, Vector3f end, float t) {
+        return new Vector3f(
+                start.x + (end.x - start.x) * t,
+                start.y + (end.y - start.y) * t,
+                start.z + (end.z - start.z) * t
+        );
+    }
+
+    public static Vector3f direction(Vector3f from, Vector3f to) {
+        return to.subtract(from).normalize();
+    }
+
+    public Vector3f abs() {
+        return new Vector3f(Math.abs(this.x), Math.abs(this.y), Math.abs(this.z));
+    }
 
     public float get(int index) {
         switch (index) {
@@ -50,52 +75,31 @@ public class Vector3f {
         }
     }
 
-
     public void set(Vector3f other) {
         this.x = other.x;
         this.y = other.y;
         this.z = other.z;
     }
 
-
-    public static Vector3f intToVector3f(int color) {
-        float r = ((color >> 16) & 0xFF) / 255.0f;
-        float g = ((color >> 8) & 0xFF) / 255.0f;
-        float b = (color & 0xFF) / 255.0f;
-        return new Vector3f(r, g, b);
-    }
-
-
     public Vector3f copy() {
         return new Vector3f(this.x, this.y, this.z);
     }
-
-    public static int vector3fToInt(Vector3f color) {
-        int r = Math.min(255, (int) (color.x * 255));
-        int g = Math.min(255, (int) (color.y * 255));
-        int b = Math.min(255, (int) (color.z * 255));
-        return (r << 16) | (g << 8) | b;
-    }
-
-    public static Vector3f lerp(Vector3f start, Vector3f end, float t) {
-        return new Vector3f(
-                start.x + (end.x - start.x) * t,
-                start.y + (end.y - start.y) * t,
-                start.z + (end.z - start.z) * t
-        );
-    }
-
 
     @Override
     public Vector3f clone() {
         return new Vector3f(this.x, this.y, this.z);
     }
+
     public Vector3f divide(Vector3f v) {
         return new Vector3f(this.x / v.x, this.y / v.y, this.z / v.z);
     }
 
     public Vector3f add(Vector3f other) {
         return new Vector3f(this.x + other.x, this.y + other.y, this.z + other.z);
+    }
+
+    public Vector3f add(float x, float y, float z) {
+        return new Vector3f(this.x + x, this.y + y, this.z + z);
     }
 
     public Vector3f subtract(Vector3f other) {

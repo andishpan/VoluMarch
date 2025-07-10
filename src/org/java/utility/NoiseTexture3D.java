@@ -21,10 +21,8 @@ import static org.lwjgl.opengl.GL13.glActiveTexture;
 
 public final class NoiseTexture3D {
 
-    private final int id;
-
-
     public final int width, height, depth;
+    private final int id;
 
     private NoiseTexture3D(int id, int width, int height, int depth) {
         this.id = id;

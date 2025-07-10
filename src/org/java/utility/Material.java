@@ -8,9 +8,7 @@ import java.nio.IntBuffer;
 import static org.lwjgl.opengl.GL20.*;
 
 
-
 public class Material {
-
 
 
     public Vector3f albedo;
@@ -45,12 +43,9 @@ public class Material {
         flagsBuffer.flip();
 
 
-
-
-
-
         glUniform3fv(albedoLoc, albedoBuffer);
         glUniform3fv(emissiveLoc, emissiveBuffer);
         glUniform1iv(flagsLoc, flagsBuffer);
+
     }
 }

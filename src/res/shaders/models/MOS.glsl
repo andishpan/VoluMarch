@@ -1,160 +1,162 @@
-
 #ifndef RAYMARCH_MOS_DEFINED
 #define RAYMARCH_MOS_DEFINED
 
-#ifndef COMMON_RAYMARCH_GLSL
-#include "common/common_raymarch.glsl"
+#ifndef MARCH_SHADOW_GLSL
+#include "common/marchShadow.glsl"
 #endif
 
 
-const int   NUM_OCTAVES     = 4;
-const float OCTAVE_SCALES[NUM_OCTAVES]  = float[](1.0, 0.5, 0.25, 0.125);
-const float OCTAVE_ECC[NUM_OCTAVES]     = float[](0.6, 0.2, 0.05, 0.01);
-const float OCTAVE_WEIGHTS[NUM_OCTAVES] = float[](0.5, 0.25, 0.125, 0.125);
+#ifndef SKY_RAYLEIGH_GLSL
+#include "common/sky_rayleigh.glsl"
+#endif
 
 
-const float OCTAVE_CDF[NUM_OCTAVES] = float[](0.5, 0.75, 0.875, 1.0);
+// —————— MOS parameters (8 octaves) ——————
+const int MAX_OCTAVES = 8;
+const float OCTAVE_ATTEN[8] = float[](
+0.5, 0.5, 0.5, 0.5,
+0.5, 0.5, 0.5, 0.5
+);// aᵢ
 
+const float OCTAVE_ECC[8] = float[](
+0.5, 0.5, 0.5, 0.5,
+0.5, 0.5, 0.5, 0.5
+);// cᵢ
 
-float hash11(float p) {
-    p = fract(p * 0.1031);
-    p *= p + 33.33;
-    p *= p + p;
-    return fract(p);
+const float OCTAVE_WEIGHTS[8] = float[](
+0.125, 0.125, 0.125, 0.125,
+0.125, 0.125, 0.125, 0.125
+);// bᵢ = 1/8
+
+// precomputed CDF of weights:
+const float OCTAVE_CDF[8] = float[](
+0.125, 0.250, 0.375, 0.500,
+0.625, 0.750, 0.875, 1.000
+);
+
+/*float hash11(float p) {
+  p = fract(p * 0.1031);
+  p *= p + 33.33;
+  p *= p + p;
+  return fract(p);
+} */
+//https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
+float pcgHash(float seed) {
+    uint x = floatBitsToUint(seed);
+    x = x * 747796405u + 2891336453u;
+    uint word = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;
+    return float((word >> 22u) ^ word) / float(0xffffffffu);
 }
+
 
 int selectOctave(float seed) {
-    float r = hash11(seed);
-    for (int i = 0; i < NUM_OCTAVES; ++i) {
-        if (r < OCTAVE_CDF[i]) return i;
-    }
-    return NUM_OCTAVES - 1;
+    for (int i = 0; i < MAX_OCTAVES; ++i)
+    if (seed < OCTAVE_CDF[i]) return i;
+    return MAX_OCTAVES - 1;
 }
 
 
 
-vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outvolumeColor) {
-    vec3 volumeColor       = vec3(0.0);
-    vec3 surfaceColor       = vec3(0.0);
-    float nearestHitT  = SCENE_MAX_T;
+vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
+    vec3 volumeColor = vec3(0.0);
+    vec3 mySky = vec3(0.0);
+    float nearestHitT  = uMaxRayDistance;
     float viewTransmittance = 1.0;
-   // const float uStepSize = 0.6;
+    // const float uStepSize = 0.6;
 
-    vec3 surfaceNormal       = vec3(0.0);
-    int  materialId   = INVALID_MATERIAL_ID;
+    vec3 surfaceNormal = vec3(0.0);
+    int  materialId = INVALID_MATERIAL_ID;
+
+    uint localVolume = 0u;
+    uint localSDF = 0u;
+    uint localEntryCount= 0u;
 
 
-    float closestT = 1e20;
-    vec3 intersectionNormal = vec3(0.0);
-    bool hitOpaque = false;
-    float waterT;
-    vec3  waterNormal;
-    if (intersectWaterPlane(rayOrigin, rayDirection, waterT, waterNormal)) {
-        if (waterT < closestT) {
-            closestT = waterT;
-            intersectionNormal = waterNormal;
-            materialId = WATER_MATERIAL_ID;
-            hitOpaque = true;
-        }
-    }
-
-    float opaqueDepth = closestT;
-    if (hitOpaque) {
-        surfaceNormal      = intersectionNormal;
-        nearestHitT  = opaqueDepth;
-    }
 
 
     float volumetricDepth = 0.0;
     for (int i = 0; i < uMaxSteps; ++i) {
+        localSDF++;
         vec3 p = rayOrigin + volumetricDepth * rayDirection;
         float distance = getVolume(p);
-        if (distance < SURFACE_DIST || volumetricDepth > nearestHitT) break;
+        if (distance < uSDFHitThreshold || volumetricDepth > nearestHitT) break;
         volumetricDepth += distance;
     }
 
 
     if (volumetricDepth < nearestHitT) {
+        localEntryCount++;
         for (int i = 0; i < uMaxVolumeSteps; ++i) {
+            localVolume++;
             volumetricDepth += uStepSize;
             if (volumetricDepth > nearestHitT) break;
+            vec3  lightCol = vec3(1.0, 0.95, 0.8) * uSunIntensity;
 
             vec3 p = rayOrigin + rayDirection * volumetricDepth;
             float sdfValue = getVolume(p);
+            float density = getDensity(p, sdfValue);
 
             if (sdfValue < 0.0) {
-                float density = getDensity(p, sdfValue);
+                vec3  lightDir = normalize(uSunDirection);
+                float cosTheta = dot(-rayDirection, lightDir);
 
-                vec3 lightDir   = normalize(uSunDirection);
-                vec3 lightColor = vec3(1.0, 0.95, 0.8) * uSunIntensity;
-                vec3 ambient    = ambientColor * 0.5;
+                float sigmaA  = uVolumetricAbsorption * density;
+                float sigmaS  = uVolumetricScattering * density;
 
-                int octave;
-                if (NUM_OCTAVES <= 2) {
-                    //  loop over all octaves
-                    for (octave = 0; octave < NUM_OCTAVES; ++octave) {
-                        float scale   = OCTAVE_SCALES[octave];
-                        float g       = OCTAVE_ECC[octave];
-                        float weight  = OCTAVE_WEIGHTS[octave];
-
-                        float sigmaT = uVolumetricAbsorption * density * scale;
-                        vec3  sigmaS = uVolumetricAlbedo    * density * scale;
-
-                        float stepTransmittance  = exp(-sigmaT * uStepSize);
-                        float lightAbsorption = (1.0 - stepTransmittance) * viewTransmittance;
-                        viewTransmittance *= stepTransmittance;
-                        if (viewTransmittance < MIN_OPACITY) break;
-
-                        float cosTheta = dot(-rayDirection, lightDir);
-                        float phase    = HenyeyGreenstein(cosTheta, g);
-
-                        float shadowTransmittance = shadowMarchMOS(p, lightDir, uShadowStepSize, uMaxLightMarchSteps,scale);
-                        vec3 scatter  = lightColor * (sigmaS * phase * shadowTransmittance);
-                        volumeColor += weight * scatter * lightAbsorption;
-                        volumeColor += ambient * lightAbsorption;
+                // ————— stochastic single-octave sampling —————
+                float random = pcgHash(dot(p, vec3(12.9898, 78.233, 37.719)) + float(i)*17.0);
+                int selection = 0;
+                for (int j = 0; j < MAX_OCTAVES; ++j) {
+                    if (random < OCTAVE_CDF[j]) {
+                        selection = j;
+                        break;
                     }
-                } else {
-                    // stochastic roulette selection
-                    octave = selectOctave(volumetricDepth + p.x + p.y + p.z);
-
-                    float scale   = OCTAVE_SCALES[octave];
-                    float g       = OCTAVE_ECC[octave];
-                    float weight  = OCTAVE_WEIGHTS[octave] * float(NUM_OCTAVES);
-
-                    float sigmaT = uVolumetricAbsorption * density * scale;
-                    vec3  sigmaS = uVolumetricAlbedo    * density * scale;
-
-                    float stepTransmittance  = exp(-sigmaT * uStepSize);
-                    float lightAbsorption = (1.0 - stepTransmittance) * viewTransmittance;
-                    viewTransmittance *= stepTransmittance;
-                    if (viewTransmittance < MIN_OPACITY) continue;
-
-                    float cosTheta = dot(-rayDirection, lightDir);
-                    float phase    = HenyeyGreenstein(cosTheta, g);
-
-                    float shadowTransmittance = shadowMarchMOS(p, lightDir,
-                    uShadowStepSize,
-                    uMaxLightMarchSteps,
-                    scale);
-                    vec3 scatter  = lightColor * (sigmaS * phase * shadowTransmittance);
-                    volumeColor += weight * scatter * lightAbsorption;
-                    volumeColor += ambient * lightAbsorption;
                 }
+
+                float ai = OCTAVE_ATTEN[selection];
+                float ci = OCTAVE_ECC[selection];
+                float bi = OCTAVE_WEIGHTS[selection];
+
+                float sigmaAi = sigmaA * ai;
+                float sigmaSi = sigmaS * ai;
+                float sigmaTi = sigmaAi + sigmaSi;
+
+                float prevTransmittance = viewTransmittance;
+
+                float stepTransmittance = exp(-sigmaTi * uStepSize);
+                //float lightAttenuation  = (1.0 - stepTransmittance) * viewTransmittance;
+
+                viewTransmittance *= stepTransmittance;
+                if (viewTransmittance < uTransmittanceThreshold) continue;
+
+                float lightAttenuation = prevTransmittance - viewTransmittance;
+
+                float phase  = HenyeyGreenstein(cosTheta, uPhaseG * ci);
+                float shadow = marchShadow(p, lightDir);
+
+                volumeColor += (sigmaSi * phase * shadow * lightCol * 4.0 * lightAttenuation) / bi;
+
             }
         }
     }
 
 
-    if (hitOpaque && materialId != INVALID_MATERIAL_ID) {
-        vec3 position      = rayOrigin + rayDirection * opaqueDepth;
 
-        getLighting(position, surfaceNormal, -rayDirection, materialId, surfaceColor);
-    } else {
-        surfaceColor = vec3(0.7, 0.85, 1.0);
+    if (nearestHitT == uMaxRayDistance)
+    {
+        mySky = getRayleighSky(rayOrigin, rayDirection);
     }
 
-    outvolumeColor = volumeColor;
-    return clamp(volumeColor, 0.0, 1.0) + viewTransmittance * surfaceColor;
+
+    outVolumeColor = volumeColor;
+    atomicAdd(volume, localVolume);
+    atomicAdd(sdf, localSDF);
+    atomicAdd(entryCount, localEntryCount);
+
+
+    vec3 hdrColor = volumeColor + viewTransmittance * mySky;
+    vec3 mapped = hdrColor / (hdrColor + vec3(1.0));
+    return mapped = clamp(mapped, 0.0, 1.0);
 }
 
 #endif

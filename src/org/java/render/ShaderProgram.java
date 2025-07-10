@@ -10,14 +10,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ShaderProgram {
 
-
     private final List<Integer> shaderIds = new ArrayList<>();
-
+    private final ConcurrentMap<String, Integer> locCache = new ConcurrentHashMap<>();
     private int id;
-
 
     public ShaderProgram(String resourceNameWithoutExtension) {
         id = glCreateProgram();
@@ -30,91 +30,11 @@ public class ShaderProgram {
         }
     }
 
-    /*public Rendering.ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
-        id = glCreateProgram();
-
-
-        loadSourceAndCompileAndAttach(vertexShaderFile, GL_VERTEX_SHADER);
-
-
-        StringBuilder combinedFragment = new StringBuilder();
-        for (String part : fragmentShaderParts) {
-            InputStream in = getInputStreamFromResourceName(part);
-            if (in == null) {
-                throw new RuntimeException("Shader part not found: " + part);
-            }
-            try (Scanner scanner = new Scanner(in)) {
-                combinedFragment.append(scanner.useDelimiter("\\A").next()).append("\n");
-            }
-        }
-
-        compileAndAttach("fragment_combined", GL_FRAGMENT_SHADER, combinedFragment.toString());
-
-        
-        glLinkProgram(id);
-        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
-            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
-        }
-    } */
-
-   /* public Rendering.ShaderProgram(String vertexShaderFile, String[] fragmentShaderParts) {
-        id = glCreateProgram();
-
-
-        loadSourceAndCompileAndAttach(vertexShaderFile, GL_VERTEX_SHADER);
-
-
-        StringBuilder combinedFragment = new StringBuilder();
-        for (String part : fragmentShaderParts) {
-            InputStream in = getInputStreamFromResourceName(part);
-            if (in == null) throw new RuntimeException("Shader part not found: " + part);
-
-            String rawSource = new Scanner(in).useDelimiter("\\A").next();
-            String preprocessed = preprocessShader(rawSource);
-            combinedFragment.append(preprocessed).append("\n");
-        }
-
-
-        compileAndAttach("fragment_combined", GL_FRAGMENT_SHADER, combinedFragment.toString());
-
-
-
-        glLinkProgram(id);
-        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
-            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
-        }
-    } */
-
-   /* public Rendering.ShaderProgram(String vertexPath, String... fragmentPaths) {
-        id = glCreateProgram();
-        if (id == 0) throw new IllegalStateException("glCreateProgram failed");
-
-        compileAndAttach(vertexPath, GL_VERTEX_SHADER);
-
-        for (String frag : fragmentPaths) {
-            compileAndAttach(frag, GL_FRAGMENT_SHADER);
-        }
-
-        glLinkProgram(id);
-        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
-            throw new RuntimeException("Program link failed:\n"
-                    + glGetProgramInfoLog(id));
-        }
-
-
-      /*  for (int sid : shaderIds) {
-            glDetachShader(id, sid);
-            glDeleteShader(sid);
-        }
-        shaderIds.clear();
-    }  */
-
     public ShaderProgram(String vertexPath, String... fragmentPaths) {
         id = glCreateProgram();
         if (id == 0) throw new IllegalStateException("glCreateProgram failed");
 
         compileAndAttach(vertexPath, GL_VERTEX_SHADER);
-
 
         StringBuilder combinedFragment = new StringBuilder();
         for (String path : fragmentPaths) {
@@ -139,6 +59,65 @@ public class ShaderProgram {
         shaderIds.clear();
     }
 
+    public ShaderProgram(String vertexShaderSource, String fragmentResourceName) {
+        id = glCreateProgram();
+
+        compileAndAttach("'vertex shader'", GL_VERTEX_SHADER, vertexShaderSource);
+        loadSourceAndCompileAndAttach(fragmentResourceName, GL_FRAGMENT_SHADER);
+        glLinkProgram(id);
+        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
+            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
+        }
+    }
+
+    private static String loadResource(String path) {
+        InputStream in = ShaderProgram.class.getResourceAsStream(path);
+        if (in == null) throw new RuntimeException("Shader file not found: " + path);
+        try (Scanner s = new Scanner(in, StandardCharsets.UTF_8)) {
+            return s.useDelimiter("\\A").next();
+        }
+    }
+
+    private static String preprocess(String src) {
+        StringBuilder out = new StringBuilder();
+        Scanner sc = new Scanner(src);
+        while (sc.hasNextLine()) {
+            String line = sc.nextLine();
+            if (line.trim().startsWith("#include")) {
+                String inc = line.split("\"")[1];
+                out.append(preprocess(loadResource("/res/shaders/" + inc)));
+            } else {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    int loc(String name) {
+        return locCache.computeIfAbsent(name,
+                n -> glGetUniformLocation(id, n));
+    }
+
+    public void setUniform1f(String name, float v) {
+        glUniform1f(loc(name), v);
+    }
+
+    public void setUniform3f(String name, float x, float y, float z) {
+        glUniform3f(loc(name), x, y, z);
+    }
+
+    public void setUniform1i(String name, int v) {
+        glUniform1i(loc(name), v);
+    }
+
+    public void setUniformMatrix4fv(String name, float[] m) {
+        glUniformMatrix4fv(loc(name), false, m);
+    }
+
+    public void setUniform(String name, boolean value) {
+        int location = glGetUniformLocation(id, name);
+        glUniform1i(location, value ? 1 : 0);
+    }
 
     private void compileAndAttach(String fileName, int type) {
         int sid = glCreateShader(type);
@@ -158,43 +137,6 @@ public class ShaderProgram {
         shaderIds.add(sid);
     }
 
-    private static String loadResource(String path) {
-        InputStream in = ShaderProgram.class.getResourceAsStream(path);
-        if (in == null) throw new RuntimeException("Shader file not found: " + path);
-        try (Scanner s = new Scanner(in, StandardCharsets.UTF_8)) {
-            return s.useDelimiter("\\A").next();
-        }
-    }
-
-
-    private static String preprocess(String src) {
-        StringBuilder out = new StringBuilder();
-        Scanner sc = new Scanner(src);
-        while (sc.hasNextLine()) {
-            String line = sc.nextLine();
-            if (line.trim().startsWith("#include")) {
-                String inc = line.split("\"")[1];
-                out.append(preprocess(loadResource("/res/shaders/" + inc)));
-            } else {
-                out.append(line).append('\n');
-            }
-        }
-        return out.toString();
-    }
-
-
-
-    public ShaderProgram(String vertexShaderSource, String fragmentResourceName) {
-        id = glCreateProgram();
-
-        compileAndAttach("'vertex shader'", GL_VERTEX_SHADER, vertexShaderSource);
-        loadSourceAndCompileAndAttach(fragmentResourceName, GL_FRAGMENT_SHADER);
-        glLinkProgram(id);
-        if (glGetProgrami(id, GL_LINK_STATUS) == GL_FALSE) {
-            throw new RuntimeException(glGetProgramInfoLog(id, glGetProgrami(id, GL_INFO_LOG_LENGTH)));
-        }
-    }
-
     public int getId() {
         return id;
     }
@@ -204,25 +146,21 @@ public class ShaderProgram {
     }
 
     private void loadSourceAndCompileAndAttach(String resourceName, int type) {
-        InputStream inputStreamFromResourceName = getInputStreamFromResourceName(resourceName);
-        if (inputStreamFromResourceName == null) {
+        InputStream in = getInputStreamFromResourceName(resourceName);
+        if (in == null) {
             if (type != GL_GEOMETRY_SHADER) {
                 throw new RuntimeException("Shader source file " + resourceName + " not found!");
             }
             return;
         }
         String source;
-        //TODO Scattering and Absorption
-        try (Scanner in = new Scanner(inputStreamFromResourceName)) {
-            source = in.useDelimiter("\\A").next();
+        try (Scanner s = new Scanner(in, StandardCharsets.UTF_8)) {
+            source = s.useDelimiter("\\A").next();
         }
         compileAndAttach(resourceName, type, source);
     }
 
-
-
     private void compileAndAttach(String resourceName, int type, String source) {
-
         if (!source.contains("\n")) {
             InputStream in = getInputStreamFromResourceName(source);
             if (in == null) {
@@ -247,7 +185,6 @@ public class ShaderProgram {
         glAttachShader(id, shaderId);
     }
 
-
     private int compileShader(String source, int type) {
         int shaderID = glCreateShader(type);
         glShaderSource(shaderID, source);
@@ -271,7 +208,6 @@ public class ShaderProgram {
         }
         return sb.toString();
     }
-
 
     private String preprocessShader(String source) {
         return preprocessShaderRecursive(source, new HashSet<>());
@@ -305,8 +241,6 @@ public class ShaderProgram {
         return processed.toString();
     }
 
-
-
     public void bind() {
         glUseProgram(id);
     }
@@ -318,7 +252,6 @@ public class ShaderProgram {
     public int getID() {
         return id;
     }
-
 
     public void setUniform(String name, int value) {
         int location = glGetUniformLocation(id, name);
@@ -338,11 +271,6 @@ public class ShaderProgram {
     public void setUniform(String name, float x, float y, float z, float w) {
         int location = glGetUniformLocation(id, name);
         glUniform4f(location, x, y, z, w);
-    }
-
-    public void setUniformMatrix4fv(String name, float[] matrix) {
-        int location = glGetUniformLocation(id, name);
-        glUniformMatrix4fv(location, false, matrix);
     }
 
     public void cleanup() {

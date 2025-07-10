@@ -82,7 +82,7 @@ public class Texture {
         return id;
     }
 
-    //NEW
+
     public void setNearestNeighborFiltering() {
         glBindTexture(GL_TEXTURE_2D, id);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

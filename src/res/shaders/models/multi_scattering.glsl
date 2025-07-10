@@ -1,132 +1,84 @@
+#ifndef RAYMARCH_DEFINED
+#define RAYMARCH_DEFINED
 
-#ifndef RAYMARCH_MULTISCAT_DEFINED
-#define RAYMARCH_MULTISCAT_DEFINED
+#ifndef MARCH_SHADOW_GLSL
+#include "common/marchShadow.glsl"
+#endif
 
-#ifndef COMMON_RAYMARCH_GLSL
-#include "common/common_raymarch.glsl"
+#ifndef SKY_RAYLEIGH_GLSL
+#include "common/sky_rayleigh.glsl"
 #endif
 
 
+vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor)
+{
+    vec3 skyColor = getRayleighSky(rayOrigin,rayDirection);
+    vec3 color = skyColor;
+    outVolumeColor = vec3(0.0);
+    float viewTransmittance = 1.0;
 
-float hash11(float p){ p=fract(p*0.1031); p*=p+33.33; p*=p+p; return fract(p);}
-vec2  hash22(vec2 p){ return vec2(hash11(p.x), hash11(p.y)); }
+    const float MAX_DISTANCE = 30.0;
+    const float HEIGHT_OFFSET = 0.2;
+    const int NUM_OCTAVES = 4;
 
+    for (float dist = uMaxRayDistance; dist > 0.0; dist -= uStepSize)
+    {
+        vec3 position = dist * rayDirection + rayOrigin;
 
-vec3 sampleHG(float g, vec2 xi){
+        vec3 windOffset = vec3(1.0,0.0,0.0) * 5.5 * uTime;
+        vec3 fbmInput   = (position + windOffset) / uNoiseScale;
+        float noise     = uNoiseHeight * fbm(fbmInput);
 
-    float cosT;
-    if (abs(g) < 1e-3)
-    cosT = 1.0 - 2.0 * xi.x;
-    else {
-        float sq = (1.0 - g*g) / (1.0 - g + 2.0*g*xi.x);
-        cosT = (1.0 + g*g - sq*sq) / (2.0*g);
-    }
-    float sinT = sqrt(max(0.0, 1.0 - cosT*cosT));
-    float phi  = 2.0 * 3.14159265 * xi.y;
-    return vec3(cos(phi)*sinT, sin(phi)*sinT, cosT);
-}
+        float cloudSignedDistance = position.y + noise;
 
+        if (cloudSignedDistance < 0.0) {
+            float density = clamp(-cloudSignedDistance, 0.0, 1.0);
 
-vec3 orthBase(vec3 n){
-    return normalize(abs(n.x)>0.5 ? vec3(n.y,-n.x,0.0)
-    : vec3(0.0,-n.z,n.y));
-}
-vec3 toWorld(vec3 v, vec3 dir){
-    vec3 u = orthBase(dir);
-    vec3 w = normalize(cross(dir, u));
-    return v.x*u + v.y*w + v.z*dir;
-}
+            // Optical properties
+            float sigmaA = uVolumetricAbsorption * density;
+            float sigmaS = uVolumetricScattering * density;
+            float sigmaT = sigmaA + sigmaS;
 
+            float stepTransmittance = exp(-sigmaT * uStepSize);
+            float prevTransmittance = viewTransmittance;
+            viewTransmittance *= stepTransmittance;
 
-float shadowMarchMS(vec3 x, vec3 L, float step, int maxSteps, inout int shadCtr){
+            if (viewTransmittance < uTransmittanceThreshold) break;
 
-    float Tr = 1.0, t = 0.0;
-    for (int i = 0; i < maxSteps; ++i){
-        ++shadCtr;
-        vec3 p = x + L * t;
-        float sdf = getVolume(p);
-        if (sdf < SURFACE_DIST){
-            float d   = getDensity(p, sdf);
-            float sigT= (uVolumetricAbsorption + uVolumetricScattering)*d;
-            Tr *= BeerLambert(sigT, step);
-            if (Tr < 0.01) break;
-        }
-        t += step;
-    }
-    return Tr;
-}
+            float lightAttenuation = prevTransmittance - viewTransmittance;
 
+            // Lighting
+            vec3 lightDir = normalize(uSunDirection);
+            vec3 lightColor = vec3(1.0, 0.95, 0.8) * uSunIntensity;
+            vec3 viewDir = normalize(rayDirection);
 
-const int   MAX_BOUNCES = 4;
-const float ROULETTE    = 0.2;
+            float shadow = marchShadow(position, lightDir); // optional: if defined
+            float phase  = HenyeyGreenstein(dot(viewDir, lightDir), uPhaseG);
 
-vec3 raymarch(vec3 rayO, vec3 rayD, out vec3 outVol, out int  outPrim, out int outShad, out int  outSdf,  out int outBounce){
+            float scatteringAlbedo = sigmaT > 0.0 ? sigmaS / sigmaT : 0.0;
 
-    int prim=0, shad=0, sdf=0, bounce=0;
+            vec3 inscatter = lightAttenuation * scatteringAlbedo * lightColor * shadow * phase;
 
-    vec3  L    = vec3(0.0);
-    vec3  beta = vec3(1.0);
-    vec3  lightCol   = vec3(1.0,0.95,0.8) * uSunIntensity;
-    vec3  sunDir   = normalize(uSunDirection);
-    float sigmaMax = uVolumetricAbsorption + uVolumetricScattering;
-
-    for (int b = 0; b < MAX_BOUNCES; ++b){
-
-
-        float t = 0.0;
-        for (;;){
-            ++sdf;
-            float xi = hash11(dot(rayO,rayD)+float(b)*13.37);
-            t += -log(1.0 - xi) / sigmaMax;
-
-            vec3  p  = rayO + rayD * t;
-            float sdfV = getVolume(p);
-            if (sdfV > SURFACE_DIST) continue;
-
-            float d = getDensity(p, sdfV);
-            if (hash11(p.x+p.y+p.z) < d) { rayO = p; break; }
+            vec3 cloudColor = vec3(1.0); // white cloud
+            color = mix(color, cloudColor, lightAttenuation * 0.4);
+            outVolumeColor += inscatter;
         }
 
-
-        if (t > SCENE_MAX_T) break;
-
-
-        float sigmaA = uVolumetricAbsorption;
-        float sigmaS = uVolumetricScattering;
-        float sigmaT = sigmaA + sigmaS;
-        float albedo = sigmaS / sigmaT;
-
-
-        ++bounce;
-        float TrSun = shadowMarchMS(rayO, sunDir, 0.6,
-        uMaxLightMarchSteps, shad);
-        float phase = HenyeyGreenstein(dot(-rayD, sunDir),
-        uBackwardScattering);
-        L += beta * albedo * TrSun * lightCol * phase;
-
-
-        beta *= albedo;
-        float maxB = max(beta.r, max(beta.g, beta.b));
-        if (maxB < ROULETTE){
-            if (hash11(float(b)*7.0) < maxB/ROULETTE)
-            beta /= maxB/ROULETTE;
-            else
-            break;
-        }
-
-
-        vec2  xi2  = hash22(vec2(dot(rayO,rayD), float(bounce)));
-        vec3  dirL = sampleHG(uBackwardScattering, xi2);
-        rayD = normalize(toWorld(dirL, rayD));
-        ++prim;
     }
 
-    outVol     = L;
-    outPrim    = prim;
-    outShad    = shad;
-    outSdf     = sdf;
-    outBounce  = bounce;
-    return L;
+    color = clamp(color, 0.0, 1.0);
+    color = color * color * (3.0 - 2.0 * color); // contrast
+
+    float sat = 0.2;
+    color = color * (1.0 + sat) - sat * dot(color, vec3(0.33));
+
+    return color;
 }
+
+
+
+
+
+
 
 #endif

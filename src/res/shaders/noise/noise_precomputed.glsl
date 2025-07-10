@@ -1,7 +1,7 @@
 #ifndef GET_NOISE_DEFINED
 #define GET_NOISE_DEFINED
 
-uniform sampler3D uPrecomputedNoise;
+//uniform sampler3D uPrecomputedNoise;
 
 float samplePrecomputedNoise(vec3 pos) {
     vec3 coord = fract(pos / uNoiseScale);

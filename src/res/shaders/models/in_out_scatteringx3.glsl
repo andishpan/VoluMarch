@@ -2,39 +2,32 @@
 #define RAYMARCH_DEFINED
 
 
-#ifndef COMMON_RAYMARCH_GLSL
-#include "common/common_raymarch.glsl"
+
+#ifndef SKY_RAYLEIGH_GLSL
+#include "common/sky_rayleigh.glsl"
 #endif
-
-
 
 
 vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor){
     vec3  volumeColor  = vec3(0.0);
-    vec3  surfaceColor = vec3(0.0);
+    vec3  mySky = vec3(0.0);
 
-    float nearestHitT      = SCENE_MAX_T;
+    float nearestHitT  = uMaxRayDistance;
     float viewTransmittance = 1.0;
 
 
     float opaqueT  = 1e20;
-    vec3  surfN    = vec3(0.0);
-    int   matID    = INVALID_MATERIAL_ID;
+    vec3  surfN  = vec3(0.0);
+    int matID  = INVALID_MATERIAL_ID;
 
-    vec3 waterN; float waterHitT;
-    if (intersectWaterPlane(rayOrigin, rayDirection, waterHitT, waterN) && waterHitT < opaqueT) {
-
-        opaqueT = waterHitT;  surfN = waterN;  matID = WATER_MATERIAL_ID;
-        nearestHitT = opaqueT;
-    }
 
 
     float volumetricDepth = 0.0;
     for (int i = 0; i < uMaxSteps; ++i) {
-
+        // atomicCounterIncrement(sdf);
         vec3 p = rayOrigin + volumetricDepth * rayDirection;
         float d = getVolume(p);
-        if (d < SURFACE_DIST || volumetricDepth > nearestHitT) break;
+        if (d < uSDFHitThreshold || volumetricDepth > nearestHitT) break;
         volumetricDepth += d;
     }
 
@@ -44,12 +37,12 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor){
         vec3  lightDir = normalize(uSunDirection);
         vec3  lightCol = vec3(1.0, 0.95, 0.8) * uSunIntensity;
 
-        float amplitude   = 1.0;
-        float stepScale   = 1.0;
+        float amplitude = 1.0;
+        float stepScale = 1.0;
 
         for (int octave = 0; octave < 3; ++octave) {
-
-            float localStep   = 0.6 * stepScale;
+            // atomicCounterIncrement(volume);
+            float localStep = 0.6 * stepScale;
             float localDepth  = volumetricDepth;
 
             while (true) {
@@ -60,30 +53,45 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor){
                 vec3 p = rayOrigin + rayDirection * localDepth;
                 float sdf = getVolume(p);
                 if (sdf >= 0.0) continue;
-                float density   = getDensity(p, sdf);
+                float density = getDensity(p, sdf);
 
 
                 float sigmaA = uVolumetricAbsorption  * density;
                 float sigmaS = uVolumetricScattering * density;
                 float sigmaT = sigmaA + sigmaS;
 
-                 //outscattering + absorption
+                //outscattering + absorption
                 float prevTransmittance = viewTransmittance;
                 viewTransmittance *= BeerLambert(sigmaT * amplitude, localStep);
-                if (viewTransmittance < MIN_OPACITY) break;
+                if (viewTransmittance < uTransmittanceThreshold) break;
 
                 float lightAbsoprtion  = prevTransmittance - viewTransmittance;
                 float lightScattering = lightAbsoprtion * (sigmaS / sigmaT);
 
 
-                float shadowT   = shadowMarchInOut(p, lightDir, uShadowStepSize, uMaxLightMarchSteps);
-                vec3  incident  = lightCol * shadowT;
+                float shadowTransmittance = 1.0;
+                float lightT = 0.0;
 
-                float mu    = dot(-rayDirection, lightDir);
+                for (int i = 0; i < uMaxShadowSteps; ++i)  {
+                    //  atomicCounterIncrement(shadow);
+                    vec3 pos = p + lightDir * lightT;
+                    float sdfValue = getVolume(pos);
+                    if (sdfValue < 0.0){
+
+                        float density = getDensity(pos, sdfValue);
+                        float sigmaT = (uVolumetricAbsorption + uVolumetricScattering) * density;
+                        shadowTransmittance *= BeerLambert(sigmaT, uShadowStepSize);
+                        if (shadowTransmittance < 0.01) break;
+                    }
+                    lightT += uShadowStepSize;
+                }
+                vec3  incident  = lightCol * shadowTransmittance;
+
+                float mu  = dot(-rayDirection, lightDir);
                 float phase = HenyeyGreenstein(mu, uPhaseG);
 
-                volumeColor += amplitude * lightScattering * phase * incident * uVolumetricAlbedo;
-                volumeColor += amplitude * lightAbsoprtion  * uVolumetricAlbedo * ambientColor;
+                volumeColor += amplitude * lightScattering * phase * incident;
+                volumeColor += amplitude * lightAbsoprtion * ambientColor;
             }
 
 
@@ -93,15 +101,16 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor){
     }
 
 
-    if (matID != INVALID_MATERIAL_ID)   {
 
-        vec3 hitPos = rayOrigin + rayDirection * opaqueT;
-        getLighting(hitPos, surfN, -rayDirection, matID, surfaceColor);
+
+    if (nearestHitT == uMaxRayDistance)
+    {
+        mySky = getRayleighSky(rayOrigin, rayDirection);
     }
-    else surfaceColor = vec3(0.7, 0.85, 1.0);
+
 
     outVolumeColor = volumeColor;
-    return clamp(volumeColor, 0.0, 1.0) + viewTransmittance * surfaceColor;
+    return clamp(volumeColor, 0.0, 1.0) + viewTransmittance * mySky;
 }
 
 #endif
