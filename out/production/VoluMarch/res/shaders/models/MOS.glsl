@@ -9,9 +9,6 @@
 #ifndef SKY_RAYLEIGH_GLSL
 #include "common/sky_rayleigh.glsl"
 #endif
-
-
-// —————— MOS parameters (8 octaves) ——————
 const int MAX_OCTAVES = 8;
 const float OCTAVE_ATTEN[8] = float[](
 0.5, 0.5, 0.5, 0.5,
@@ -27,20 +24,12 @@ const float OCTAVE_WEIGHTS[8] = float[](
 0.125, 0.125, 0.125, 0.125,
 0.125, 0.125, 0.125, 0.125
 );// bᵢ = 1/8
-
-// precomputed CDF of weights:
 const float OCTAVE_CDF[8] = float[](
 0.125, 0.250, 0.375, 0.500,
 0.625, 0.750, 0.875, 1.000
 );
 
-/*float hash11(float p) {
-  p = fract(p * 0.1031);
-  p *= p + 33.33;
-  p *= p + p;
-  return fract(p);
-} */
-//https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
+
 float pcgHash(float seed) {
     uint x = floatBitsToUint(seed);
     x = x * 747796405u + 2891336453u;
@@ -62,7 +51,6 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
     vec3 mySky = vec3(0.0);
     float nearestHitT  = uMaxRayDistance;
     float viewTransmittance = 1.0;
-    // const float uStepSize = 0.6;
 
     vec3 surfaceNormal = vec3(0.0);
     int  materialId = INVALID_MATERIAL_ID;
@@ -102,8 +90,6 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
 
                 float sigmaA  = uVolumetricAbsorption * density;
                 float sigmaS  = uVolumetricScattering * density;
-
-                // ————— stochastic single-octave sampling —————
                 float random = pcgHash(dot(p, vec3(12.9898, 78.233, 37.719)) + float(i)*17.0);
                 int selection = 0;
                 for (int j = 0; j < MAX_OCTAVES; ++j) {
@@ -124,7 +110,6 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
                 float prevTransmittance = viewTransmittance;
 
                 float stepTransmittance = exp(-sigmaTi * uStepSize);
-                //float lightAttenuation  = (1.0 - stepTransmittance) * viewTransmittance;
 
                 viewTransmittance *= stepTransmittance;
                 if (viewTransmittance < uTransmittanceThreshold) continue;
@@ -142,8 +127,9 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
 
 
 
-    if (nearestHitT == uMaxRayDistance)
-    {
+    if(uUseCubeMap){
+        mySky = texture(uEnvironmentMap, normalize(vRayDirection)).rgb;
+    }else{
         mySky = getRayleighSky(rayOrigin, rayDirection);
     }
 

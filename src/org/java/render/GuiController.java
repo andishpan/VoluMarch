@@ -13,15 +13,11 @@ import static org.lwjgl.glfw.GLFW.*;
 import imgui.type.ImBoolean;
 import org.java.utility.Vector3f;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
 
 public class GuiController {
     private final RendererSSBO renderer;
     private final ImBoolean useBlueNoise = new ImBoolean(false);
+    private final ImBoolean useSkyDome = new ImBoolean(false);
     Vector3f forward;
     private RenderSettings settings;
     private ImGuiImplGlfw imGuiGlfw;
@@ -35,7 +31,7 @@ public class GuiController {
     private int activeContext = 0;
     private String[] shapeLabels = {"MixedVolume", "Sphere", "Torus", "Cube", "Cumulus", "Stratocumulus", "Stratus", "Smoke"};
     private String[] methodLabels = {"Beer-Lambert", "HG", "MOS", "Powder", "Beer-Lambert-AABB", "HG-AABB", "MOS-AABB","Powder-AABB"};
-    private String[] noiseLabels = {"3D Texture", "Perlin-Worley", "Inigo-Gradient"};
+    private String[] noiseLabels = {"Inigo-Gradient", "Cellular", "3D Texture"};
 
     private String[] noiseVariantPaths;
 
@@ -91,12 +87,13 @@ public class GuiController {
 
     public void render(float deltaTime) {
         ImGui.begin("Volume Control Panel");
+        //System.out.println("GUI sees settings: " + System.identityHashCode(settings));
 
-        ImGui.text("Edit target:");
-        ImGui.sameLine();
-        if (ImGui.radioButton("A##ctx", activeContext == 0)) activeContext = 0;
-        ImGui.sameLine();
-        if (ImGui.radioButton("B##ctx", activeContext == 1)) activeContext = 1;
+//        ImGui.text("Edit target:");
+//        ImGui.sameLine();
+//        if (ImGui.radioButton("A##ctx", activeContext == 0)) activeContext = 0;
+//        ImGui.sameLine();
+//        if (ImGui.radioButton("B##ctx", activeContext == 1)) activeContext = 1;
 
         RenderSettings preset = new RenderSettings();
         RenderSettings.applyMethodPreset(preset, settings.getCurrentQuality());
@@ -150,95 +147,40 @@ public class GuiController {
             RenderSettings.applyMethodPreset(settings, RenderSettings.Quality.ULTRA);
         }
 
-        ImGui.separator();
-        ImGui.text("Scene Preset");
 
 
-        if (ImGui.button("BACKLIT_FOG")) {
-            settings.setCurrentScene(RenderSettings.Scene.BACKLIT_FOG);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.BACKLIT_FOG);
-
-        }
-        ImGui.sameLine();
-
-
-        if (ImGui.button("SPOTLIGHT_SMOKE")) {
-            settings.setCurrentScene(RenderSettings.Scene.SPOTLIGHT_SMOKE);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.SPOTLIGHT_SMOKE);
-        }
-        ImGui.sameLine();
-
-
-        if (ImGui.button("TOP_DOWN_CLOUD")) {
-            settings.setCurrentScene(RenderSettings.Scene.TOP_DOWN_CLOUD);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.TOP_DOWN_CLOUD);
-        }
-        ImGui.sameLine();
-
-
-        if (ImGui.button("RIM_LIGHTING")) {
-            settings.setCurrentScene(RenderSettings.Scene.RIM_LIGHTING);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.RIM_LIGHTING);
-        }
-
-        if (ImGui.button("SIDE_FILL")) {
-            settings.setCurrentScene(RenderSettings.Scene.SIDE_FILL);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.SIDE_FILL);
-        }
-
-
-        if (ImGui.button("FRONT_FILL")) {
-            settings.setCurrentScene(RenderSettings.Scene.FRONT_FILL);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.FRONT_FILL);
-        }
-
-        if (ImGui.button("GOLDEN_HOUR")) {
-            settings.setCurrentScene(RenderSettings.Scene.WARM);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.WARM);
-        }
-
-        if (ImGui.button("MOONLIGHT")) {
-            settings.setCurrentScene(RenderSettings.Scene.DARK);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.DARK);
-        }
-
-        if (ImGui.button("OVERCAST")) {
-            settings.setCurrentScene(RenderSettings.Scene.DIFFUSE);
-            RenderSettings.applyScenePreset(settings, RenderSettings.Scene.DIFFUSE);
-        }
-
-        ImGui.separator();
-        ImGui.text("Display");
-        int[] screens = {settings.numScreens};
-        if (ImGui.sliderInt("Screens", screens, 1, 2)) {
-            settings.numScreens = screens[0];
-        }
-        if (settings.numScreens == 2) {
-            ImGui.separator();
-            ImGui.text("Shaders");
-
-            if (ImGui.beginCombo("Shader A", methodLabels[settings.screenMethods[0]])) {
-                for (int i = 0; i < methodLabels.length; i++) {
-                    boolean sel = settings.screenMethods[0] == i;
-                    if (ImGui.selectable(methodLabels[i], sel)) {
-                        settings.screenMethods[0] = i;
-                    }
-                    if (sel) ImGui.setItemDefaultFocus();
-                }
-                ImGui.endCombo();
-            }
-
-            if (ImGui.beginCombo("Shader B", methodLabels[settings.screenMethods[1]])) {
-                for (int i = 0; i < methodLabels.length; i++) {
-                    boolean sel = settings.screenMethods[1] == i;
-                    if (ImGui.selectable(methodLabels[i], sel)) {
-                        settings.screenMethods[1] = i;
-                    }
-                    if (sel) ImGui.setItemDefaultFocus();
-                }
-                ImGui.endCombo();
-            }
-        }
+//        ImGui.separator();
+//        ImGui.text("Display");
+//        int[] screens = {settings.numScreens};
+//        if (ImGui.sliderInt("Screens", screens, 1, 2)) {
+//            settings.numScreens = screens[0];
+//        }
+//        if (settings.numScreens == 2) {
+//            ImGui.separator();
+//            ImGui.text("Shaders");
+//
+//            if (ImGui.beginCombo("Shader A", methodLabels[settings.screenMethods[0]])) {
+//                for (int i = 0; i < methodLabels.length; i++) {
+//                    boolean sel = settings.screenMethods[0] == i;
+//                    if (ImGui.selectable(methodLabels[i], sel)) {
+//                        settings.screenMethods[0] = i;
+//                    }
+//                    if (sel) ImGui.setItemDefaultFocus();
+//                }
+//                ImGui.endCombo();
+//            }
+//
+//            if (ImGui.beginCombo("Shader B", methodLabels[settings.screenMethods[1]])) {
+//                for (int i = 0; i < methodLabels.length; i++) {
+//                    boolean sel = settings.screenMethods[1] == i;
+//                    if (ImGui.selectable(methodLabels[i], sel)) {
+//                        settings.screenMethods[1] = i;
+//                    }
+//                    if (sel) ImGui.setItemDefaultFocus();
+//                }
+//                ImGui.endCombo();
+//            }
+//        }
 
 
         ImGui.separator();
@@ -370,7 +312,7 @@ public class GuiController {
         ImGui.separator();
         ImGui.text("Forward/Backward");
         float[] phaseG_Array = {settings.phaseG};
-        ImGui.sliderFloat("Phase g  (-1 = full back  |  0 = iso  |  +1 = full forward)",
+        ImGui.sliderFloat("Phase g",
                 phaseG_Array, -0.9f, 0.9f);
         settings.phaseG = phaseG_Array[0];
         ImGui.sameLine();
@@ -443,6 +385,14 @@ public class GuiController {
         if (ImGui.checkbox("Use Blue Noise", useBlueNoise)) {
             settings.useBlueNoise = useBlueNoise.get();
         }
+
+        ImGui.separator();
+        ImGui.text("Sky Dome");
+        if (ImGui.checkbox("Use Sky Dome", useSkyDome)) {
+            settings.useCubeMap = useSkyDome.get();
+        }
+
+
         float[] noiseJ = {settings.noiseJitter};
         if (ImGui.sliderFloat(" Blue Noise Jitter", noiseJ, 0.0f, 1.0f)) settings.noiseJitter = noiseJ[0];
         ImGui.sameLine();
@@ -482,7 +432,7 @@ public class GuiController {
 
         ImGui.setNextWindowPos(10, 10, ImGuiCond.Always);
         ImGui.setNextWindowSize(250, 0);
-        ImGui.begin("Camera Debug Info", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.begin("Volume Analysis Panel", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize);
 
 
         Vector3f cloudCenter = new Vector3f(0.0f, 20.0f, -25.0f);
@@ -543,16 +493,25 @@ public class GuiController {
 
 
         ImGui.separator();
-        if (ImGui.button("Predict Current Cloud")) {
+        if (ImGui.button("Predict Cloud")) {
             settings.requestPrediction();
+            settings.markPredictionStarted();
             System.out.println("Prediction requested");
         }
 
-        float score = settings.getLastCloudScore();
-        if (score >= 0f) {
-            ImGui.text(String.format("Cloud probability: %.2f%%", score * 100f));
+
+        if (settings.isPredictionInProgress()) {
+            ImGui.text("Prediction: thinking...");
+            ImGui.progressBar(0.0f);
+        } else {
+            float score = settings.getLastCloudScore();
+            String label = settings.getLastCloudLabel();
+            ImGui.text(String.format("Prediction: %s (%.2f%%)", label, score * 100f));
             ImGui.progressBar(score);
         }
+
+
+
 
         ImGui.end();
 

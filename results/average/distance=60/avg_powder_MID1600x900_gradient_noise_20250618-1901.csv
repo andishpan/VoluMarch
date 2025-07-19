@@ -1,0 +1,31 @@
+# Method: powder
+# Volume Form : MixedVolume
+#Noise Type: Inigo-Gradient
+#Radiative Transfer Model: Unknown
+# Resolution: 1600x900
+# Distance To Cloud: 59.491
+# Max SDF Steps: 50
+# Max Volume Steps: 50
+#Max Shadow Steps: 25
+# Step Size: 0.8
+# SDF Blend Radius: 4.0
+# Shadow Step Size: 1.12
+#Number of Noise Octaves: 5
+# volumetric Absorption coefficient: 0.061880
+# volumetric Scattering coefficient: 0.339960
+# phaseG: 0.100
+# sunIntensity: 5.000
+#Total Rendering Time : 34.8087363
+
+metric,mean,std,min,50%%,max
+cpu_ms,52.899618,2.430133,47.985699,52.497100,72.360300
+gpu_ms,52.537405,2.297770,47.671296,52.157904,66.060032
+volume,4.636848,0.280998,4.221722,4.597653,5.331819
+shadow,26.123975,0.986876,24.864811,25.676509,28.122458
+sdf,11.726485,0.035075,11.641646,11.733239,11.786953
+pixels,1440000.000000,0.000000,1440000.000000,1440000.000000,1440000.000000
+distance,0.416810,0.001145,0.414809,0.417080,0.418446
+spp,44.135483,2.737120,40.902321,43.409801,50.213848
+hit_ratio,0.129093,0.004348,0.122349,0.128701,0.138980
+
+# Bottleneck: Balanced

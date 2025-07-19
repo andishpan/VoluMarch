@@ -1,0 +1,13 @@
+Metric,Value
+Total GPU render time (0 frames),0.00 seconds
+Total CPU render time (0 frames),0.00 seconds
+Average GPU time per frame,nan ms
+= GPU FPS,nan FPS
+Average CPU time per frame,nan ms
+= CPU FPS,nan FPS
+Bottleneck classification,Balanced
+Run type,QualityPreset: ULTRA
+Average volume steps per frame,nan
+Average shadow steps per frame,nan
+Average sdf steps per frame,nan
+Average total steps per frame,nan

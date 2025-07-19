@@ -1,0 +1,31 @@
+# Method: MOS
+# Volume Form : MixedVolume
+#Noise Type: Inigo-Gradient
+#Radiative Transfer Model: Beer-Lambert Light Attenuation *  Henyey-Greenstein (Multi-Octave)
+# Resolution: 1600x900
+# Distance To Cloud: 59.491
+# Max SDF Steps: 50
+# Max Volume Steps: 50
+#Max Shadow Steps: 25
+# Step Size: 0.8
+# SDF Blend Radius: 4.0
+# Shadow Step Size: 1.12
+#Number of Noise Octaves: 5
+# volumetric Absorption coefficient: 0.061880
+# volumetric Scattering coefficient: 0.339960
+# phaseG: 0.100
+# sunIntensity: 5.000
+#Total Rendering Time : 35.827595401
+
+metric,mean,std,min,50%%,max
+cpu_ms,54.583081,2.326656,49.416299,54.352701,78.757200
+gpu_ms,54.257522,2.312169,49.073440,54.034752,77.499200
+volume,6.467088,0.221290,6.118299,6.437664,6.948794
+shadow,28.123859,1.084379,26.284718,28.081734,30.363674
+sdf,11.724840,0.036087,11.641491,11.732264,11.787434
+pixels,1440000.000000,0.000000,1440000.000000,1440000.000000,1440000.000000
+distance,0.418964,0.000312,0.418454,0.418982,0.419456
+spp,44.680559,2.617368,40.902321,44.639799,50.213848
+hit_ratio,0.129342,0.004426,0.122366,0.128753,0.138976
+
+# Bottleneck: Balanced

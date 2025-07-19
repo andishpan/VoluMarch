@@ -2,6 +2,7 @@ package org.java.utility;
 
 import java.nio.FloatBuffer;
 
+////Base for this class from Computer graphics course Project at HTW Berlin by Prof. Dr. Tobias Lenz
 public class Matrix4 {
 
     float[][] daten = new float[4][4];

@@ -1,12 +1,6 @@
 #version 430 core
 #extension GL_ARB_shader_atomic_counters : require
 
-
-
-
-
-
-
 #ifndef RENDER_SETTINGS_GLSL
 #include "common/render_settings.glsl"
 #endif
@@ -42,7 +36,10 @@ void main() {
 
     if (uUseBlueNoise){
         if (getLuminance(volumeColor) > 0.01) {
-            float noiseVal = texture(iChannel0, gl_FragCoord.xy / uResolution.xy).r;
+            float layer = fract(uTime) * float(64);
+            vec3 uvw  = vec3(gl_FragCoord.xy / uResolution.xy, layer);
+            float noiseVal = texture(uBlueNoise, uvw).r;
+
             color += (noiseVal - 0.5) * uNoiseJitter;
             //color = vec3(1.0,1.0,1.0);
         }

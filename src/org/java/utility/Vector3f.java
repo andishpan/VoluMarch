@@ -1,5 +1,6 @@
 package org.java.utility;
 
+//Base for this class from Computer graphics course Project at HTW Berlin by Prof. Dr. Tobias Lenz
 public class Vector3f {
     public float x, y, z;
 

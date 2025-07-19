@@ -223,6 +223,29 @@ public class Data {
 
             w.write("\n# Bottleneck: " + getBottleneck() + "\n");
         }
+
+//        String outDir = "C:\\RT\\VoluMarch\\results\\plots\\" + methodName;
+//        Files.createDirectories(Paths.get(outDir));
+//
+//        try {
+//            ProcessBuilder pb = new ProcessBuilder(
+//                    "python", "C:\\RT\\VoluMarch\\scripts\\plot_data.py",
+//                    "-b", "C:\\RT\\VoluMarch\\results\\average\\",
+//                    "-m", methodName
+//            );
+//            pb.directory(new File(outDir));
+//            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+//            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+//            pb.environment().put("PYTHONIOENCODING", "utf-8");
+//            Process process = pb.start();
+//            process.waitFor();
+//            System.out.println("[Plot] Charts for " + methodName + " saved to " + outDir);
+//        } catch (IOException | InterruptedException e) {
+//            System.err.println("[Plot] Failed to generate plots for: " + methodName);
+//            e.printStackTrace();
+//        }
+
+
     }
 
 

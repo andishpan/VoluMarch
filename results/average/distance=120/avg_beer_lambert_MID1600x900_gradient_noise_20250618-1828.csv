@@ -1,0 +1,31 @@
+# Method: beer_lambert
+# Volume Form : MixedVolume
+#Noise Type: Inigo-Gradient
+#Radiative Transfer Model: Unknown
+# Resolution: 1600x900
+# Distance To Cloud: 120.292
+# Max SDF Steps: 50
+# Max Volume Steps: 50
+#Max Shadow Steps: 25
+# Step Size: 0.8
+# SDF Blend Radius: 4.0
+# Shadow Step Size: 1.12
+#Number of Noise Octaves: 5
+# volumetric Absorption coefficient: 0.061880
+# volumetric Scattering coefficient: 0.339960
+# phaseG: 0.100
+# sunIntensity: 5.000
+#Total Rendering Time : 16.4226123
+
+metric,mean,std,min,50%%,max
+cpu_ms,24.824926,1.593798,22.710401,24.593100,49.015300
+gpu_ms,24.455694,1.588743,22.327296,24.214512,48.693248
+volume,1.320748,0.050494,1.208715,1.347656,1.371346
+shadow,5.938585,0.084310,5.812752,5.943868,6.050076
+sdf,9.286050,0.032174,9.233232,9.299386,9.328847
+pixels,1440000.000000,0.000000,1440000.000000,1440000.000000,1440000.000000
+distance,0.193721,0.000540,0.192841,0.194017,0.194417
+spp,16.545383,0.079575,16.418381,16.553442,16.657280
+hit_ratio,0.026415,0.001010,0.024174,0.026953,0.027427
+
+# Bottleneck: Balanced

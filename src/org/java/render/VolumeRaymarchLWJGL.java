@@ -17,12 +17,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
 
@@ -55,12 +58,9 @@ public class VolumeRaymarchLWJGL {
     private String requestedMethod = null;
     private String requestedNoise = null;
     private int frameIndex = 0;
-
-
-
-    public int getWidth()  { return width; }
-    public int getHeight() { return height; }
-
+    private Process pythonProcess;
+    private int environmentMapTexID;
+    private int noiseID;
 
     public static void main(String[] args) throws IOException {
         VolumeRaymarchLWJGL app = new VolumeRaymarchLWJGL();
@@ -128,6 +128,14 @@ public class VolumeRaymarchLWJGL {
         app.run();
     }
 
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
     public void setRequestedMethod(String method) {
         this.requestedMethod = method;
     }
@@ -152,7 +160,8 @@ public class VolumeRaymarchLWJGL {
     }
 
 
-    void init() throws IOException {
+    void init() {
+        System.out.println("Main settings object: " + System.identityHashCode(settings));
 
         width = settings.resolutionX;
         height = settings.resolutionY;
@@ -165,8 +174,8 @@ public class VolumeRaymarchLWJGL {
         }
 
 
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         window = glfwCreateWindow(width, height, "Volume Raymarch LWJGL", NULL, NULL);
         if (window == NULL) {
@@ -209,39 +218,48 @@ public class VolumeRaymarchLWJGL {
         int n = settings.getCurrentNoise();
         shader = combinedShaders[m][n];
 
-if(debugMode){
-    Thread pythonWatcher = new Thread(() -> {
-        Pattern predPat = Pattern.compile("Prediction: \\w+ \\(p_cloud=(\\d+\\.\\d+)\\)");
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    "python", "C:\\cloudClassifier\\Cloud-Classification\\comp.py"
-            );
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
+        if (debugMode) {
+            Thread pythonWatcher = new Thread(() -> {
+                System.out.println("Watcher sees settings: " + System.identityHashCode(settings));
 
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println("[PYTHON] " + line);
+                Pattern predPat = Pattern.compile("Prediction for .*?: (\\w+) \\(p_cloud=(\\d+\\.\\d+)\\)");
 
-                    // parse the p_cloud= value out of the line
-                    Matcher matcher = predPat.matcher(line);
-                    if (matcher.find()) {
-                        float score = Float.parseFloat(matcher.group(1));
-                        settings.setLastCloudScore(score);
+                try {
+                    ProcessBuilder pb = new ProcessBuilder(
+                            "python", "C:\\cloudClassifier\\Cloud-Classification\\comp.py"
+                    );
+                    pb.redirectErrorStream(true);
+                    pythonProcess = pb.start();
+
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(pythonProcess.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            System.out.println("[PYTHON] " + line);
+
+                            // parse the p_cloud= value out of the line
+                            Matcher matcher = predPat.matcher(line);
+                            if (matcher.find()) {
+                                // float score = Float.parseFloat(matcher.group(1));
+                                //settings.setLastCloudScore(score);
+                                String lbl = matcher.group(1);
+                                float score = Float.parseFloat(matcher.group(2));
+                                settings.setLastCloudLabel(lbl);
+                                settings.setLastCloudScore(score);
+                                settings.markPredictionDone();
+                                System.out.printf("Matched prediction: label=%s, p_cloud=%f\n", lbl, score);
+
+                            }
+                        }
                     }
+                } catch (IOException e) {
+                    System.err.println("Failed to start Python watcher:");
+                    e.printStackTrace();
                 }
-            }
-        } catch (IOException e) {
-            System.err.println("Failed to start Python watcher:");
-            e.printStackTrace();
+            });
+            pythonWatcher.setDaemon(true);
+            pythonWatcher.start();
         }
-    });
-    pythonWatcher.setDaemon(true);
-    pythonWatcher.start();
-}
-
 
 
         renderer = new RendererSSBO(shader);
@@ -249,9 +267,22 @@ if(debugMode){
 
         guiController.setNoiseVariantPaths(noiseVariants);
 
-
+        //https://momentsingraphics.de/3DBlueNoise.html
         blueNoise = new Texture3DFromSlices("C:\\RT\\VoluMarch\\assets\\3DTextures\\64_64_64", "HDR_L_", 64, 64, 64);
-        noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\scripts\\cloud_noise_3d.bin", 128, 128, 128);
+        GL45.glBindTextureUnit(0, blueNoise.getId());
+
+        //python generated bin file
+        noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\noise\\simplex_noise_64x64x64.bin", 64, 64, 64);
+        GL45.glBindTextureUnit(2, noiseTexture3D.getId());
+        //cubemap
+        environmentMapTexID = shader.loadCubemap("C:\\RT\\VoluMarch\\assets\\Cubemap");
+        GL45.glBindTextureUnit(3, environmentMapTexID);
+//        glActiveTexture(GL_TEXTURE0 + 3);
+//        glBindTexture(GL_TEXTURE_CUBE_MAP, environmentMapTexID);
+
+
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, blueNoise.getId());
 
 
         String vramLine = GpuMemoryInfo.query();
@@ -265,9 +296,10 @@ if(debugMode){
 
     private void initShaders() {
         String[] allNoiseVariants = {
-                "noise/noise_precomputed.glsl",
+                "noise/gradient_noise.glsl",
                 "noise/noise.glsl",
-                "noise/gradient_noise.glsl"
+                "noise/noise_precomputed.glsl"
+
         };
 
         if (testing) {
@@ -311,9 +343,9 @@ if(debugMode){
 
             methodVariants = new String[]{
                     "models/beer_lambert.glsl",
-//                    "models/single_scattering.glsl",
-//                    "models/MOS.glsl",
-//                    "models/powder.glsl",
+                    "models/single_scattering.glsl",
+                    "models/MOS.glsl",
+                    "models/powder.glsl",
 //                    "models/beer_lambert_aabb.glsl",
 //                    "models/hg_aabb.glsl",
 //                    "models/mos_aabb.glsl",
@@ -392,7 +424,7 @@ if(debugMode){
             }
 
 
-            renderer.render(elapsedTime, width, height, settings, blueNoise, noiseTexture3D);
+            renderer.render(elapsedTime, width, height, settings);
 
 
             if (settings.isPredictionRequested()) {
@@ -402,12 +434,11 @@ if(debugMode){
                 String tag = extractModelName(methodVariants[settings.getCurrentMethod()])
                         + "_" + noiseTag
                         + "_" + settings.getCurrentQuality()
-                        + "_" + settings.getCurrentScene()
                         + "_" + guiController.getCurrentShapeLabel()
                         + "_" + Screenshot.nowTag();
 
 
-                Path out = Paths.get("results", "screenshots").resolve("last_image.png");
+                Path out = Paths.get("results", "predictions").resolve(tag + ".png");
                 try {
                     Files.createDirectories(out.getParent());
                     Screenshot.saveRGBA(width, height, out);
@@ -427,7 +458,6 @@ if(debugMode){
                 String tag = extractModelName(methodVariants[settings.getCurrentMethod()])
                         + "_" + noiseTag
                         + "_" + settings.getCurrentQuality()
-                        + "_" + settings.getCurrentScene()
                         + "_" + guiController.getCurrentShapeLabel()
                         + "_" + Screenshot.nowTag();
 
@@ -505,62 +535,47 @@ if(debugMode){
         glfwDestroyWindow(window);
         glfwTerminate();
 
-
-        if (testing) {
-
-            String shape = guiController.getShapeName(settings.currentShape);
-            String noise = guiController.getNoiseName(settings.currentNoise);
-            String resolutionTag = settings.resolutionX + "x" + settings.resolutionY;
-            String timeTag = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"));
-
-
-            String csvFilename;
-            int methodIndex = settings.getCurrentMethod();
-            String methodPath = methodVariants[methodIndex];
-            String modelName = extractModelName(methodPath);
-            String noiseTag = requestedNoise != null ? requestedNoise : "noise";
-
-            String qualTag = settings.getCurrentQuality() != null
-                    ? settings.getCurrentQuality().name()
-                    : (settings.isReferenceMode() ? "REF" : "CUSTOM");
-
-
-            csvFilename = modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
-
-
-            String csvPath = "C:\\RT\\VoluMarch\\results\\fullruns\\" + "full_" + csvFilename;
-
-            if (settings.getCurrentQuality() != null) {
-                bench.setRunLabel("QualityPreset: " + settings.getCurrentQuality().name());
-            } else if (settings.isReferenceMode()) {
-                bench.setRunLabel("ReferenceMode");
-            } else {
-                bench.setRunLabel("Custom");
+        if (debugMode) {
+            if (pythonProcess != null && pythonProcess.isAlive()) {
+                System.out.println("Shutting down Python process...");
+                pythonProcess.destroy();
             }
-            float distanceToCloud = renderer.getDistanceToCloud();
-
-            bench.saveCsv(csvPath);
-            bench.saveCsvAveragesOnly("C:\\RT\\VoluMarch\\results\\average\\" + "avg_" + csvFilename, modelName, shape, noise, settings.resolutionX, settings.resolutionY, settings, distanceToCloud);
-
-
-            //plotData(modelName, csvPath);
         }
 
+        if (!testing) return;
 
-    }
+        // Metadata
+        String shape = guiController.getShapeName(settings.currentShape);
+        String noise = guiController.getNoiseName(settings.currentNoise);
+        String resolutionTag = settings.resolutionX + "x" + settings.resolutionY;
+        String timeTag = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"));
+        int methodIndex = settings.getCurrentMethod();
+        String methodPath = methodVariants[methodIndex];
+        String modelName = extractModelName(methodPath);
+        String noiseTag = requestedNoise != null ? requestedNoise : "noise";
+
+        String qualTag = settings.getCurrentQuality() != null
+                ? settings.getCurrentQuality().name()
+                : (settings.isReferenceMode() ? "REF" : "CUSTOM");
 
 
-    private void plotData(String modelName, String csvFullPath) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("python", "C:\\RT\\VoluMarch\\scripts\\plot_frames.py", modelName, csvFullPath);
-            pb.inheritIO();
-            pb.environment().put("PYTHONIOENCODING", "utf-8");
-            Process process = pb.start();
-            int exitCode = process.waitFor();
-            System.out.println("Python script exited with code: " + exitCode);
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
+        float distanceToCloud = renderer.getDistanceToCloud();
+        String distanceFolder = "distance=" + (int) distanceToCloud;
+        Path fullDir = Paths.get("C:\\RT\\VoluMarch\\results\\fullruns", distanceFolder, modelName);
+        Files.createDirectories(fullDir);
+
+        String fullCsvFilename = "full_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
+        Path fullCsvPath = fullDir.resolve(fullCsvFilename);
+        bench.saveCsv(fullCsvPath.toString());
+
+
+        Path avgDir = Paths.get("C:\\RT\\VoluMarch\\results\\average", distanceFolder, modelName);
+        Files.createDirectories(avgDir);
+        String avgCsvFilename = "avg_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
+        Path avgCsvPath = avgDir.resolve(avgCsvFilename);
+        bench.saveCsvAveragesOnly(avgCsvPath.toString(), modelName, shape, noise, settings.resolutionX, settings.resolutionY, settings, distanceToCloud);
+
+
     }
 
 

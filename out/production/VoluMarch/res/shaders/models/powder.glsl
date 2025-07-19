@@ -21,7 +21,6 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
     vec3 mySky = vec3(0.0);
     float nearestHitT  = uMaxRayDistance;
     float viewTransmittance = 1.0;
-    //const float uStepSize = 0.6;
     float shadowTransmittance  = 1.0;
 
     vec3 surfaceNormal = vec3(0.0);
@@ -34,13 +33,9 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
     uint localSDF = 0u;
 
     uint localEntryCount= 0u;
-
-    // find entry point using sphere tracing with adaptive stepsize
     float volumetricDepth = 0.0;
     for (int i = 0; i < uMaxSteps; i++) {
         localSDF++;
-        //sdf++;
-        //atomicCounterIncrement(sdf);
         vec3 p = rayOrigin + volumetricDepth * rayDirection;
         float distance = getVolume(p);
         if (distance < uSDFHitThreshold || volumetricDepth > nearestHitT) {
@@ -49,36 +44,24 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
 
         volumetricDepth += distance;
     }
-
-
-    //volume ray march fixed step size with lighting
     if (volumetricDepth < nearestHitT) {
         localEntryCount++;
-        // atomicCounterIncrement(entryCount);
         for (int i = 0; i < uMaxVolumeSteps; i++) {
             localVolume++;
-            // primary++;
-            // atomicCounterIncrement(volume);
-            // volumetricDepth += uStepSize;
-            //if (volumetricDepth > nearestHitT) break;
 
             vec3 p = rayOrigin + rayDirection * volumetricDepth;
             float sdfValue = getVolume(p);
-            //float stepSize = uStepSize * clamp(0.5 + abs(sdfValue), 0.1, 1.0);
             float density  = getDensity(p, sdfValue);
-            //float stepSize = adaptiveStep(sdfValue,density);
 
             if (volumetricDepth  > nearestHitT) break;
-            // inside volume – Beer–Lambert absorption only
             if (sdfValue < 0.0) {
-                // float density   = getDensity(p, sdfValue);
                 float prevTransmittance = viewTransmittance;
 
 
                 float sigmaS = uVolumetricScattering * density;
                 float sigmaT = uVolumetricScattering * density * uStepSize;
                 float scatterPortion = 1.0 - exp(-sigmaT);
-                float powderFactor = (1.0 - exp(-uPowderStrength * sigmaT)) * smoothstep(0.0, 10.0, abs(sdfValue));
+                float powderFactor = (1.0 - exp(-uPowderStrength * sigmaT)) * smoothstep(0.0, 2.0, abs(sdfValue));
 
 
                 float sigmaA = uVolumetricAbsorption * density;
@@ -97,11 +80,10 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
                 float shadowTransmittance = marchShadow(p, lightDir);
 
 
-                // float HG = HenyeyGreenstein(dot(viewDir, lightDir), uPhaseG);
-                // vec3 energy =  lightAttenuation * lightCol * shadowTransmittance * HG;
+                 float HG = HenyeyGreenstein(dot(viewDir, lightDir), uPhaseG);
 
 
-                volumeColor += scatterPortion *  scatteringAlbedo * lightCol* shadowTransmittance  *  powderFactor;
+                volumeColor += scatterPortion *  scatteringAlbedo * lightCol* shadowTransmittance  *  powderFactor * HG;
 
 
             }
@@ -110,21 +92,17 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
         }
     }
 
-    // Sky / background colour
-
-    if (nearestHitT == uMaxRayDistance)
-    {
+    if(uUseCubeMap){
+        mySky = texture(uEnvironmentMap, normalize(vRayDirection)).rgb;
+    }else{
         mySky = getRayleighSky(rayOrigin, rayDirection);
     }
+
 
     outVolumeColor = volumeColor;
     atomicAdd(volume, localVolume);
     atomicAdd(sdf, localSDF);
     atomicAdd(entryCount, localEntryCount);
-
-
-    //maybe removes needed hdr info for tone mapping
-    // return clamp(volumeColor, 0.0, 1.0) + viewTransmittance * mySky;
     vec3 hdrColor = volumeColor + viewTransmittance * mySky;
     vec3 mapped = hdrColor / (hdrColor + vec3(1.0));
     return mapped = clamp(mapped, 0.0, 1.0);

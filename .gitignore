@@ -1,0 +1,29 @@
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+*.jar
+*.class
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Logs
+*.log
+
+# Misc
+*.swp
+*.bak

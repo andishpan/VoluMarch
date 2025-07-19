@@ -1,5 +1,8 @@
 package org.java.render;
 
+import org.lwjgl.BufferUtils;
+import org.lwjgl.stb.STBImage;
+
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL32.*;
@@ -8,11 +11,14 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+//Base for this class from Computer graphics course Project at HTW Berlin by Prof. Dr. Tobias Lenz
 public class ShaderProgram {
 
     private final List<Integer> shaderIds = new ArrayList<>();
@@ -271,6 +277,38 @@ public class ShaderProgram {
     public void setUniform(String name, float x, float y, float z, float w) {
         int location = glGetUniformLocation(id, name);
         glUniform4f(location, x, y, z, w);
+    }
+
+    public int loadCubemap(String dir) {
+        String[] faces = {
+                "px.png",  // +X right
+                "nx.png",  // –X left
+                "py.png",  // +Y top
+                "ny.png",  // –Y bottom
+                "pz.png",  // +Z back
+                "nz.png"   // –Z front
+        };
+
+        int id = glGenTextures();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+        for (int i = 0; i < 6; i++) {
+            IntBuffer w = BufferUtils.createIntBuffer(1),
+                    h = BufferUtils.createIntBuffer(1),
+                    comp = BufferUtils.createIntBuffer(1);
+            ByteBuffer data = STBImage.stbi_load(dir + "/" + faces[i], w, h, comp, 3);
+            if (data == null)
+                throw new RuntimeException("Could not load sky face: " + faces[i]);
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                    0, GL_RGB, w.get(0), h.get(0),
+                    0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            STBImage.stbi_image_free(data);
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S,   GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T,   GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R,   GL_CLAMP_TO_EDGE);
+        return id;
     }
 
     public void cleanup() {

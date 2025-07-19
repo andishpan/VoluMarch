@@ -14,16 +14,22 @@ public class RenderSettings {
     public Vector3f sunDirection = new Vector3f(0.372f, 0.512f, -0.116f);
     public Vector3f sunColour = new Vector3f(1.0f, 0.95f, 0.8f);
     public float sunIntensity = 5.0f;
-    public float volumetricAbsorption = 0.06188f;
-    public float volumetricScattering = 0.33996f;
+//    public float volumetricAbsorption = 0.06188f;
+//    public float volumetricScattering = 0.33996f;
+public float volumetricAbsorption = 0.06188f;
+    public float volumetricScattering = 0.10108f;
     public float phaseG = 0.100f;
     public boolean useBlueNoise;
+    public boolean useCubeMap;
     public float powderStrength = 0.9f;
     public float sdfBlendRadius = 6.0f;
-    public float noiseScale = 18.879f;
-    public float noiseHeight = 6.413f;
+//    public float noiseScale = 18.879f;
+//    public float noiseHeight = 6.413f;
 //    public float noiseScale = 10.0f;
 //    public float noiseHeight = 16.0f;
+
+        public float noiseScale = 7.923f;
+    public float noiseHeight = 8.472f;
     public int currentNoise = 0;
     public int tilePeriod;
     public int noiseOctaves;
@@ -53,8 +59,36 @@ public class RenderSettings {
     private Quality currentQuality = null;
     private Scene currentScene = Scene.BACKLIT_FOG;
 
+    private volatile String lastCloudLabel = "";
+    private volatile float  lastCloudScore = 0f;
 
-    private float lastCloudScore = -1f;
+
+
+
+
+    // add these methods:
+    public void setLastCloudLabel(String label) {
+        this.lastCloudLabel = label;
+    }
+    public String getLastCloudLabel() {
+        return lastCloudLabel;
+    }
+
+    private volatile boolean predictionInProgress = false;
+
+    public void markPredictionStarted() {
+        predictionInProgress = true;
+    }
+    public void markPredictionDone() {
+        predictionInProgress = false;
+    }
+    public boolean isPredictionInProgress() {
+        return predictionInProgress;
+    }
+
+
+
+
 
     public void setLastCloudScore(float s) { this.lastCloudScore = s; }
     public float getLastCloudScore()   { return lastCloudScore; }
@@ -70,12 +104,13 @@ public class RenderSettings {
                 rs.noiseOctaves = 2;
 
                 rs.useBlueNoise = false;
-                rs.powderStrength = 2.0f;
-                rs.sdfBlendRadius = 2.0f;
+                rs.powderStrength = 20.0f;
+
 
                 rs.numMosOctaves = 2;
-                rs.volumetricAbsorption = 0.06188f;
-                rs.volumetricScattering = 0.33996f;
+//                rs.volumetricAbsorption = 0.06188f;
+//                rs.volumetricScattering = 0.33996f;
+                rs.sdfBlendRadius = 2.0f;
 
 
             }
@@ -87,12 +122,13 @@ public class RenderSettings {
                 rs.shadowStepSize = 0.80f * 1.4f;
                 rs.noiseOctaves = 5;
 
-                rs.powderStrength = 4.0f;
+                rs.powderStrength = 10.0f;
                 rs.useBlueNoise = false;
+                rs.sdfBlendRadius = 4.0f;
 
                 rs.numMosOctaves = 4;
-                rs.volumetricAbsorption = 0.06188f;
-                rs.volumetricScattering = 0.33996f;
+//                rs.volumetricAbsorption = 0.06188f;
+//                rs.volumetricScattering = 0.33996f;
 
             }
             case HIGH -> {
@@ -103,13 +139,13 @@ public class RenderSettings {
                 rs.stepSize = 0.40f;
                 rs.shadowStepSize = 0.40f * 1.3f;
                 rs.noiseOctaves = 7;
-
-                rs.powderStrength = 6.0f;
+                rs.sdfBlendRadius = 6.0f;
+                rs.powderStrength = 15.0f;
 
                 rs.useBlueNoise = false;
                 rs.numMosOctaves = 6;
-                rs.volumetricAbsorption = 0.06188f;
-                rs.volumetricScattering = 0.33996f;
+//                rs.volumetricAbsorption = 0.06188f;
+//                rs.volumetricScattering = 0.33996f;
 
             }
 
@@ -120,14 +156,14 @@ public class RenderSettings {
                 rs.stepSize = 0.25f;
                 rs.shadowStepSize = 0.25f * 1.2f;
                 rs.noiseOctaves = 10;
-
-                rs.powderStrength = 8.0f;
+                rs.sdfBlendRadius = 8.0f;
+                rs.powderStrength = 20.0f;
 
                 rs.numMosOctaves = 8;
 
                 rs.useBlueNoise = false;
-                rs.volumetricAbsorption = 0.06188f;
-                rs.volumetricScattering = 0.33996f;
+//                rs.volumetricAbsorption = 0.06188f;
+//                rs.volumetricScattering = 0.33996f;
 
 
             }
@@ -136,114 +172,7 @@ public class RenderSettings {
 
     }
 
-    public static void applyScenePreset(RenderSettings rs, Scene scene) {
 
-        rs.setCurrentScene(scene);
-
-        Vector3f cloudCenter = new Vector3f(0.0f, 20.0f, -25.0f);
-
-        rs.ambientLight = 0.10f;
-        rs.sunColour = new Vector3f(1.0f, 0.95f, 0.8f);
-
-        switch (scene) {
-            case BACKLIT_FOG -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 5.0f, 35.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                Vector3f viewDir = new Vector3f(rs.cameraLookAt).subtract(rs.cameraPos).normalize();
-                rs.setSunDirection(new Vector3f(viewDir).negate());
-                rs.sunIntensity = 5.0f;
-            }
-
-            case SPOTLIGHT_SMOKE -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 3.0f, 30.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 1.0f, 0.0f));
-                rs.sunIntensity = 8.0f;
-            }
-
-            case TOP_DOWN_CLOUD -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 60.0f, 0.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 0.0f, -1.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 1.0f, -0.15f).normalize());
-                rs.sunIntensity = 6.0f;
-            }
-
-            case RIM_LIGHTING -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(-30.0f, 10.0f, 30.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.354f, 0.707f, -0.612f));
-                rs.sunIntensity = 5.0f;
-            }
-
-            case SIDE_FILL -> {
-                rs.cameraPos = new Vector3f(-48.6f, 25.9f, 1.7f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(-0.999f, 0.052f, 0.000f));
-                rs.sunIntensity = 4.0f;
-            }
-
-            case FRONT_FILL -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 5.0f, -35.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 0.052f, 0.999f));
-                rs.sunIntensity = 5.0f;
-            }
-
-            case NEUTRAL -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 10.0f, 35.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 1.0f, 0.0f));
-                rs.sunIntensity = 6.0f;
-            }
-
-            case WARM -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(-25.0f, 8.0f, 35.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 0.052f, -0.999f));
-                rs.sunColour = new Vector3f(1.0f, 0.80f, 0.60f);
-                rs.sunIntensity = 8.0f;
-            }
-
-            case DARK -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(10.0f, 15.0f, 40.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(-0.1f, 0.3f, -0.95f));
-                rs.sunColour = new Vector3f(0.60f, 0.70f, 1.00f);
-                rs.sunIntensity = 0.8f;
-                rs.ambientLight = 0.02f;
-            }
-
-            case DIFFUSE -> {
-                rs.cameraPos = new Vector3f(cloudCenter).add(0.0f, 8.0f, 40.0f);
-                rs.cameraLookAt = new Vector3f(cloudCenter);
-                rs.cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
-
-                rs.setSunDirection(new Vector3f(0.0f, 1.0f, 0.0f));
-                rs.sunIntensity = 0.0f;
-                rs.ambientLight = 0.40f;
-            }
-        }
-
-        rs.viewDir = new Vector3f(rs.cameraLookAt).subtract(rs.cameraPos);
-    }
 
     public void setSunDirection(Vector3f direction) {
         sunDirection.set(direction);

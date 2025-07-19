@@ -2,7 +2,7 @@
 #define RENDER_SETTINGS_GLSL
 //#extension GL_NV_uniform_buffer_std430_layout : enable
 layout(location = 0) out vec4  fragColor;
-layout(binding = 0) uniform sampler2D  iChannel0;
+layout(binding = 0) uniform sampler3D  uBlueNoise;
 layout(binding = 2) uniform sampler3D  uPrecomputedNoise;
 layout(binding = 3) uniform samplerCube uEnvironmentMap;
 layout(std430, binding = 0) buffer Counters {
@@ -60,6 +60,8 @@ layout(std140, binding = 1) uniform Settings {
     float sdfBlendRadius;
 
     bool uUseBlueNoise;
+    bool uUseCubeMap;
+    float _pad_useSkydome;
 
     float uTransmittanceThreshold;
     float uSDFHitThreshold;
@@ -69,28 +71,14 @@ layout(std140, binding = 1) uniform Settings {
 
 
 
-
-const vec3  kRayleigh  = vec3(5.8e-3, 1.35e-2, 3.31e-2) * 50.0;// 1/λ⁴ in RGB order
-// Mie is almost gray, scale later by user strength
-const vec3  kMie   = vec3(1.0);
-
 vec3 ambientColor;
-
-
 #define WATER_MATERIAL_ID 2
 #define PI 3.14159
 #define EPSILON 0.0001
 #define USE_BLUE_NOISE 1
 #define NUM_LIGHTS 0
-
 const float EXTINCTION_MULT = 1.0;
-
-
-
 #define NUM_SCATTER_OCTAVES 4
-
 #define INVALID_MATERIAL_ID int(-1)
 #define NUM_MATERIALS 3
-
-
 #endif
