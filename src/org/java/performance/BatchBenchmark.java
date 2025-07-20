@@ -18,7 +18,7 @@ public class BatchBenchmark {
          System.err.println("""
                 Usage: BatchBenchmark [<quality>] <noise> <resolution> <model1> [model2] ...
                   quality    : optional (LOW | MID | HIGH | ULTRA)
-                  noise      : e.g. noise_perlin
+                  noise      : e.g. gradient_noise
                   resolution : e.g. 1600x900
                   modelX     : e.g. beer_lambert
             """);

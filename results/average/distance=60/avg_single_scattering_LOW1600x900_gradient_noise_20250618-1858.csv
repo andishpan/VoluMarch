@@ -1,4 +1,4 @@
-# Method: single_scattering
+# Method: henyey_greenstein
 # Volume Form : MixedVolume
 #Noise Type: Inigo-Gradient
 #Radiative Transfer Model: Unknown

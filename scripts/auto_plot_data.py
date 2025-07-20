@@ -16,7 +16,7 @@ MODEL_DISPLAY_MAPPING = {
     "beer_lambert": "Beer Lambert",
     "mos": "Multiple Octave Scattering",
     "powder": "Powder",
-    "single_scattering": "Henyey Greenstein",
+    "henyey_greenstein": "Henyey Greenstein",
 }
 
 IMAGE_WIDTH, IMAGE_HEIGHT = 1600, 900

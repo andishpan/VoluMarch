@@ -343,7 +343,7 @@ public class VolumeRaymarchLWJGL {
 
             methodVariants = new String[]{
                     "models/beer_lambert.glsl",
-                    "models/single_scattering.glsl",
+                    "models/henyey_greenstein.glsl",
                     "models/MOS.glsl",
                     "models/powder.glsl",
 //                    "models/beer_lambert_aabb.glsl",
@@ -539,8 +539,20 @@ public class VolumeRaymarchLWJGL {
             if (pythonProcess != null && pythonProcess.isAlive()) {
                 System.out.println("Shutting down Python process...");
                 pythonProcess.destroy();
+
+                try {
+                    boolean exited = pythonProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+                    if (!exited) {
+                        System.out.println("Python process did not terminate in time – forcing shutdown...");
+                        pythonProcess.destroyForcibly();
+                    }
+                } catch (InterruptedException e) {
+                    System.err.println("Interrupted while waiting for Python process to terminate.");
+                    pythonProcess.destroyForcibly();
+                }
             }
         }
+
 
         if (!testing) return;
 

@@ -11,7 +11,7 @@ from PIL import Image
 #https://github.com/gorakhargosh/watchdog
 # configuration
 WATCH_DIR = r"C:\RT\VoluMarch\results\predictions"
-PREFIXES = ("beer_lambert", "single_scattering", "MOS", "powder")
+PREFIXES = ("beer_lambert", "henyey_greenstein", "MOS", "powder")
 MODEL_PATH = r"C:\cloudClassifier\Cloud-Classification\ccsn_cloudNotCloud_classification_model.keras"
 THRESH = 0.40
 
