@@ -11,22 +11,22 @@
 #endif
 const int MAX_OCTAVES = 8;
 const float OCTAVE_ATTEN[8] = float[](
-0.5, 0.5, 0.5, 0.5,
-0.5, 0.5, 0.5, 0.5
+1.0, 0.8, 0.6, 0.5,
+0.4, 0.3, 0.2, 0.1
 );// aᵢ
 
 const float OCTAVE_ECC[8] = float[](
-0.5, 0.5, 0.5, 0.5,
-0.5, 0.5, 0.5, 0.5
+0.9, 0.8, 0.6, 0.4,
+0.2, 0.0, -0.2, -0.4
 );// cᵢ
 
 const float OCTAVE_WEIGHTS[8] = float[](
-0.125, 0.125, 0.125, 0.125,
-0.125, 0.125, 0.125, 0.125
+0.25, 0.20, 0.15, 0.12,
+0.10, 0.08, 0.06, 0.04
 );// bᵢ = 1/8
 const float OCTAVE_CDF[8] = float[](
-0.125, 0.250, 0.375, 0.500,
-0.625, 0.750, 0.875, 1.000
+0.25, 0.45, 0.60, 0.72,
+0.82, 0.90, 0.96, 1.00
 );
 
 
@@ -106,6 +106,7 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
                 float sigmaAi = sigmaA * ai;
                 float sigmaSi = sigmaS * ai;
                 float sigmaTi = sigmaAi + sigmaSi;
+                float scatteringAlbedo = sigmaSi / sigmaTi;
 
                 float prevTransmittance = viewTransmittance;
 
@@ -119,7 +120,7 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
                 float phase  = HenyeyGreenstein(cosTheta, uPhaseG * ci);
                 float shadow = marchShadow(p, lightDir);
 
-                volumeColor += (sigmaSi * phase * shadow * lightCol * 4.0 * lightAttenuation) / bi;
+                volumeColor += (scatteringAlbedo * phase * shadow * lightCol * 4.0 * lightAttenuation) / bi;
 
             }
         }

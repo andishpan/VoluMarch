@@ -60,6 +60,7 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
 
                 float sigmaS = uVolumetricScattering * density;
                 float sigmaT = uVolumetricScattering * density * uStepSize;
+                //float sigmaT = sigmaA + sigmaS;
                 float scatterPortion = 1.0 - exp(-sigmaT);
                 float powderFactor = (1.0 - exp(-uPowderStrength * sigmaT)) * smoothstep(0.0, 2.0, abs(sdfValue));
 
@@ -70,7 +71,7 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
 
                 if (viewTransmittance < uTransmittanceThreshold) break;
 
-
+                float lightAttenuation = prevTransmittance - viewTransmittance;
                 vec3  lightDir = uSunDirection;
                 vec3  lightCol = vec3(1.0, 0.95, 0.8) * uSunIntensity;
                 vec3 viewDir = normalize(rayDirection);
@@ -83,7 +84,7 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, out vec3 outVolumeColor) {
                  float HG = HenyeyGreenstein(dot(viewDir, lightDir), uPhaseG);
 
 
-                volumeColor += scatterPortion *  scatteringAlbedo * lightCol* shadowTransmittance  *  powderFactor * HG;
+                volumeColor += lightAttenuation *  scatteringAlbedo * lightCol* shadowTransmittance  *  powderFactor * HG;
 
 
             }

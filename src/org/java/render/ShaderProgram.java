@@ -57,12 +57,12 @@ public class ShaderProgram {
             throw new RuntimeException("Program link failed:\n"
                     + glGetProgramInfoLog(id));
         }
-
         for (int sid : shaderIds) {
             glDetachShader(id, sid);
             glDeleteShader(sid);
         }
         shaderIds.clear();
+
     }
 
     public ShaderProgram(String vertexShaderSource, String fragmentResourceName) {

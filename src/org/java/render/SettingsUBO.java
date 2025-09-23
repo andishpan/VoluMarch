@@ -19,7 +19,7 @@ class SettingsUBO {
 
     SettingsUBO() {
         ubo = glGenBuffers();
-        buf = BufferUtils.createByteBuffer(256 + 5 * Float.BYTES);
+        buf = BufferUtils.createByteBuffer(216);
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
         glBufferData(GL_UNIFORM_BUFFER, buf.capacity(), GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, BINDING, ubo);

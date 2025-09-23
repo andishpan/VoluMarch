@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 
+
 RX = re.compile(r"^avg_(.+?)_(LOW|MID|HIGH|ULTRA).*\.csv$", re.I)
 STAGE_METRICS = ["volume", "shadow", "sdf"]
 TIME_METRIC = "gpu_ms"
@@ -29,7 +30,14 @@ def save_fig(fig, outpath_base: Path):
     fig.write_image(outpath_base.with_suffix('.png'))
     print(f"Erzeugt: {outpath_base.with_suffix('.png')}")
 
-
+#extracts distance from folder name and model and preset from file name
+# reads CSV into DataFrame and adds columns model, preset, distance, total_time
+# raises ValueError if parsing fails
+# expects folder structure: .../distance=*/avg_<model>_<preset>*.csv
+# e.g. .../distance=60/avg_beer_lambert_HIGH_*.csv
+# total_time is read from comment line starting with #Total Rendering Time
+# if not found, total_time is None
+# returns DataFrame with added columns
 def read_csv(fp: Path) -> pd.DataFrame:
     try:
         distance = int(fp.parent.name.split("=", 1)[1])
@@ -56,7 +64,11 @@ def read_csv(fp: Path) -> pd.DataFrame:
     df["total_time"] = total_time
     return df
 
-
+# loads all avg_*.csv files under base path into a tidy DataFrame
+# adds model_display and distance_str columns
+# fills model_display using MODEL_DISPLAY_MAPPING
+# distance_str is distance + " Einheiten"
+# raises RuntimeError if no CSVs found
 def load_tidy(base: Path) -> pd.DataFrame:
     frames = []
     for p in base.rglob("avg_*_*.csv"):
@@ -76,23 +88,24 @@ def load_tidy(base: Path) -> pd.DataFrame:
 
 
 def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
-    sub = df[df.metric.isin(SAMPLE_METRICS)]
-    if model:
+    sub = df[df.metric.isin(SAMPLE_METRICS)]# filter to relevant metrics
+    if model:# filter to specific model if given
         sub = sub[sub.model == model]
-    if not all(m in sub.metric.unique() for m in SAMPLE_METRICS):
+    if not all(m in sub.metric.unique() for m in SAMPLE_METRICS):# check if both metrics are present
         print("Überspringe Effizienz-Streuung – fehlende 'spp' oder 'hit_ratio'")
         return
-
+# create pivot table with mean values for each combination of model, preset, distance
+    #eine Zeile pro Modell
     pivot = (
         sub.pivot_table(
             index=["model", "model_display", "preset", "distance"],
             columns="metric", values="mean"
-        ).reset_index().dropna(subset=SAMPLE_METRICS)
+        ).reset_index().dropna(subset=SAMPLE_METRICS)# drop rows with NaN in either metric
     )
     if pivot.empty:
         print("Überspringe Effizienz-Streuung – keine Daten")
         return
-
+# scatter plot of hit_ratio vs spp, colored by preset, sized by distance
     fig = px.scatter(
         pivot,
         x="spp", y="hit_ratio", color="preset",
@@ -114,7 +127,8 @@ def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None) -> No
     outpath = outdir / (f"effizienz_{model}" if model else "effizienz")
     save_fig(fig, outpath)
 
-
+# plots cost per sample (gpu_ms / spp) vs preset, colored by distance
+# bar plot with facets for each model if no model filter
 def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
     sub = df[df.metric.isin([TIME_METRIC, "spp"])]
     if model:
@@ -150,7 +164,7 @@ def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> N
     outpath = outdir / (f"kosten_pro_abtastung_{model}" if model else "kosten_pro_abtastung")
     save_fig(fig, outpath)
 
-
+# plots total rendering time vs preset, colored by distance
 def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
     pivot = df[["model", "model_display", "preset", "distance", "total_time"]].drop_duplicates()
     if model:
@@ -160,7 +174,7 @@ def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
         print("Überspringe Gesamtzeit – keine Daten")
         return
 
-    pivot["distance_str"] = pivot["distance"].astype(str) + " Einheiten"
+    pivot["distance_str"] = pivot["distance"].astype(str) + " Einheiten"# create distance string for legend
     fig = px.bar(
         pivot,
         x="preset", y="total_time", color="distance_str",
@@ -178,12 +192,14 @@ def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
     outpath = outdir / (f"gesamtzeit_{model}" if model else "gesamtzeit")
     save_fig(fig, outpath)
 
-
+# plots sampling comparison for all models or a specific quality preset
+# scatter plot of hit_ratio vs spp, colored by model, symbol by preset if no quality
 def sampling_comparison_plot(df: pd.DataFrame, outdir: Path, quality: str = None) -> None:
     sub = df[df.metric.isin(SAMPLE_METRICS)]
     if quality:
         sub = sub[sub.preset == quality]
-    pivot = (
+
+    pivot = (# create pivot table with mean values for each combination of model, preset, distance
         sub.pivot_table(
             index=["model", "model_display", "preset", "distance"],
             columns="metric", values="mean"
@@ -218,6 +234,13 @@ def sampling_comparison_plot(df: pd.DataFrame, outdir: Path, quality: str = None
 
 
 def main() -> None:
+    # command line arguments
+    # -b/--base : base directory with distance=* subdirs (required)
+    # -m/--model : optional model filter (e.g. beer_lambert)
+    # -r/--run : only run specific plot (choices: sampling_comparison)
+    # -q/--quality : preset for sampling_comparison (choices: LOW, MID, HIGH, ULTRA)
+    # if -r is sampling_comparison, -q is required
+    # output PNGs are saved to ./plot_data_plots/
     ap = argparse.ArgumentParser(description="Erzeuge PNG-Diagramme aus avg_*.csv")
     ap.add_argument("-b", "--base", type=Path, required=True, help="Stammordner mit Unterordnern distance=*")
     ap.add_argument("-m", "--model", type=str, default=None, help="(Optional) Modellfilter z.B. 'beer_lambert'")
@@ -230,7 +253,8 @@ def main() -> None:
     outdir = Path.cwd() / "plot_data_plots"
     outdir.mkdir(parents=True, exist_ok=True)
     # can run like this : python plot_data.py -b /path/to/data -r sampling_comparison -q HIGH
-
+# or like this : python plot_data.py -b /path/to/data -m beer_lambert
+# or like this : python plot_data.py -b /path/to/data
     if args.run == "sampling_comparison":
         if not args.quality:
             print("Fehler: -q/--quality ist erforderlich bei -r sampling_comparison")
@@ -241,7 +265,7 @@ def main() -> None:
     sampling_efficiency(tidy, outdir, args.model)
     cost_per_sample_plot(tidy, outdir, args.model)
     total_time_plot(tidy, outdir, args.model)
-
+# if no model filter, also do sampling comparison for all models
     if args.quality:
         sampling_comparison_plot(tidy, outdir, quality=args.quality)
     else:

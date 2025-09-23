@@ -88,7 +88,7 @@ float getDensity(vec3 p, float sdfValue){
 
     float sdfMul = (sdfValue < 0.0) ? min(abs(sdfValue), 1.0) : 0.0;
     float density = (fbm(p / 6.0) + 0.5);
-    return sdfMul;
+    return  sdfMul * density;
 
 
 }

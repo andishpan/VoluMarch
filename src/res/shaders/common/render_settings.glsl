@@ -12,6 +12,8 @@ layout(std430, binding = 0) buffer Counters {
     uint entryCount;
 };
 
+//256 byte aligned
+// 216 echte bytes
 layout(std140, binding = 1) uniform Settings {
 
     vec3 uCameraPosition;  float _pad0;
@@ -27,43 +29,51 @@ layout(std140, binding = 1) uniform Settings {
 
     int uCurrentMethod;
     float uVolumetricAbsorption;
+
     float uVolumetricScattering;
     float uPhaseG;
 
 //shape
     int uObjectShape;
     int uPrevShape;
+
     float uShapeTransition;
 
 //noise
     int uCurrentNoise;
+
     float uNoiseScale;
     float uNoiseHeight;
+
     int uTilePeriod;
     int uNoiseOctaves;
+
     int uNumMosOctaves;
     float _pad_afterNumMos;
-
 
 //steps
     int uMaxSteps;
     int uMaxVolumeSteps;
+
     int uMaxShadowSteps;
     float uStepSize;
-    float uShadowStepSize;
 
+    float uShadowStepSize;
 
 //scattering
     float uForwardScattering;
+
     float uBackwardScattering;
     float uPowderStrength;
-    float sdfBlendRadius;
 
+    float sdfBlendRadius;
     bool uUseBlueNoise;
+
     bool uUseCubeMap;
     float _pad_useSkydome;
 
     float uTransmittanceThreshold;
+
     float uSDFHitThreshold;
     float uNoiseJitter;
     float uMaxRayDistance;
