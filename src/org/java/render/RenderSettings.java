@@ -2,6 +2,8 @@ package org.java.render;
 
 import org.java.utility.Vector3f;
 
+import java.nio.file.Path;
+
 public class RenderSettings {
 
     public final float transitionSpeed = 1.5f;
@@ -62,11 +64,19 @@ public float volumetricAbsorption = 0.06188f;
     private volatile String lastCloudLabel = "";
     private volatile float  lastCloudScore = 0f;
 
+    private Path lastPredictionPath;
+
+    public void setLastPredictionPath(Path path) {
+        this.lastPredictionPath = path;
+    }
+
+    public Path getLastPredictionPath() {
+        return lastPredictionPath;
+    }
 
 
 
 
-    // add these methods:
     public void setLastCloudLabel(String label) {
         this.lastCloudLabel = label;
     }
@@ -110,7 +120,7 @@ public float volumetricAbsorption = 0.06188f;
                 rs.numMosOctaves = 2;
 //                rs.volumetricAbsorption = 0.06188f;
 //                rs.volumetricScattering = 0.33996f;
-                rs.sdfBlendRadius = 2.0f;
+                rs.sdfBlendRadius = 10.555f;
 
 
             }

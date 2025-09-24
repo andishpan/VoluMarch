@@ -226,7 +226,7 @@ public class VolumeRaymarchLWJGL {
 
                 try {
                     ProcessBuilder pb = new ProcessBuilder(
-                            "python", "C:\\cloudClassifier\\Cloud-Classification\\comp.py"
+                            "python", "Cloud-Classification\\comp.py"
                     );
                     pb.redirectErrorStream(true);
                     pythonProcess = pb.start();
@@ -249,7 +249,25 @@ public class VolumeRaymarchLWJGL {
                                 settings.markPredictionDone();
                                 System.out.printf("Matched prediction: label=%s, p_cloud=%f\n", lbl, score);
 
+
+                                Path lastScreenshot = settings.getLastPredictionPath();
+                                if (lastScreenshot != null && Files.exists(lastScreenshot)) {
+                                    try {
+                                        Files.delete(lastScreenshot);
+                                        System.out.println("Deleted screenshot: " + lastScreenshot);
+                                        settings.setLastPredictionPath(null);
+                                    } catch (IOException e) {
+                                        System.err.println("Failed to delete screenshot:");
+                                        e.printStackTrace();
+                                    }
+                                }
+
+
+
                             }
+
+
+
                         }
                     }
                 } catch (IOException e) {
@@ -268,14 +286,14 @@ public class VolumeRaymarchLWJGL {
         guiController.setNoiseVariantPaths(noiseVariants);
 
         //https://momentsingraphics.de/3DBlueNoise.html
-        blueNoise = new Texture3DFromSlices("C:\\RT\\VoluMarch\\assets\\3DTextures\\64_64_64", "HDR_L_", 64, 64, 64);
+        blueNoise = new Texture3DFromSlices("assets\\3DTextures\\64_64_64", "HDR_L_", 64, 64, 64);
         GL45.glBindTextureUnit(0, blueNoise.getId());
 
         //python generated bin file
-        noiseTexture3D = new Texture3D("C:\\RT\\VoluMarch\\src\\res\\shaders\\textures\\noise\\simplex_noise_64x64x64.bin", 64, 64, 64);
+        noiseTexture3D = new Texture3D("src\\res\\shaders\\textures\\noise\\simplex_noise_64x64x64.bin", 64, 64, 64);
         GL45.glBindTextureUnit(2, noiseTexture3D.getId());
         //cubemap
-        environmentMapTexID = shader.loadCubemap("C:\\RT\\VoluMarch\\assets\\Cubemap");
+        environmentMapTexID = shader.loadCubemap("assets\\Cubemap");
         GL45.glBindTextureUnit(3, environmentMapTexID);
 //        glActiveTexture(GL_TEXTURE0 + 3);
 //        glBindTexture(GL_TEXTURE_CUBE_MAP, environmentMapTexID);
@@ -447,7 +465,10 @@ public class VolumeRaymarchLWJGL {
                     e.printStackTrace();
                 }
 
+                settings.setLastPredictionPath(out);
                 settings.clearPredictionFlag();
+
+
             }
 
 
@@ -573,7 +594,7 @@ public class VolumeRaymarchLWJGL {
 
         float distanceToCloud = renderer.getDistanceToCloud();
         String distanceFolder = "distance=" + (int) distanceToCloud;
-        Path fullDir = Paths.get("C:\\RT\\VoluMarch\\results\\fullruns", distanceFolder, modelName);
+        Path fullDir = Paths.get("results\\fullruns", distanceFolder, modelName);
         Files.createDirectories(fullDir);
 
         String fullCsvFilename = "full_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
@@ -581,7 +602,7 @@ public class VolumeRaymarchLWJGL {
         bench.saveCsv(fullCsvPath.toString());
 
 
-        Path avgDir = Paths.get("C:\\RT\\VoluMarch\\results\\average", distanceFolder, modelName);
+        Path avgDir = Paths.get("results\\average", distanceFolder, modelName);
         Files.createDirectories(avgDir);
         String avgCsvFilename = "avg_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
         Path avgCsvPath = avgDir.resolve(avgCsvFilename);

@@ -12,7 +12,7 @@ from PIL import Image
 # configuration
 WATCH_DIR = r"C:\RT\VoluMarch\results\predictions"
 PREFIXES = ("beer_lambert", "henyey_greenstein", "MOS", "powder")
-MODEL_PATH = r"C:\cloudClassifier\Cloud-Classification\ccsn_cloudNotCloud_classification_model.keras"
+MODEL_PATH = r"Cloud-Classification\ccsn_cloudNotCloud_classification_model.keras"
 THRESH = 0.40
 
 # logging setup
@@ -21,6 +21,8 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S"
 )
+logging.info(f"Using PREFIXES: {PREFIXES}")
+
 
 # load model
 logging.info(f"Loading model from {MODEL_PATH}")
@@ -29,16 +31,27 @@ logging.info("Model loaded; starting observer")
 
 
 def classify_image(path: Path):
+    try:
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            im = im.resize((224, 224))
+            arr = img_to_array(im) / 255.0
+        x = np.expand_dims(arr, 0)
+        p_not = float(model.predict(x, verbose=0)[0][0])
+        p_cloud = 1 - p_not
+        label = "cloud" if p_cloud >= THRESH else "notcloud"
+        logging.info(f"Prediction for {path.name}: {label} (p_cloud={p_cloud:.4f})")
 
-    with Image.open(path) as im:
-        im = im.convert("RGB")
-        im = im.resize((224, 224))
-        arr = img_to_array(im) / 255.0
-    x = np.expand_dims(arr, 0)
-    p_not = float(model.predict(x, verbose=0)[0][0])
-    p_cloud = 1 - p_not
-    label = "cloud" if p_cloud >= THRESH else "notcloud"
-    logging.info(f"Prediction for {path.name}: {label} (p_cloud={p_cloud:.4f})")
+    except Exception as e:
+        logging.error(f"Failed to process {path.name}: {e}")
+        return
+
+    try:
+        os.remove(path)
+        logging.info(f"Deleted image: {path.name}")
+    except Exception as e:
+        logging.warning(f"Could not delete {path.name}: {e}")
+
 
 
 class ImageHandler(FileSystemEventHandler):
@@ -56,6 +69,7 @@ class ImageHandler(FileSystemEventHandler):
 
         src = Path(event.src_path)
         name_lower = src.name.lower()
+        print(f"[DEBUG] Saw file: {name_lower}")
 
         if not any(name_lower.startswith(pref.lower()) for pref in PREFIXES):
             return

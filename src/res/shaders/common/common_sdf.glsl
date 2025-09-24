@@ -60,7 +60,7 @@ float getShape(vec3 p, int id){
 
     vec3 c = vec3(0.0, 20.0, -25.0);
     float r = 5.0;
-    vec3  halfExt = vec3(10.0);
+    vec3  halfExt = vec3(5.0);
     // increases the region  => density function returns non zero values over a bigger region
     //  float blendRadius = 2.0;
 
@@ -71,7 +71,7 @@ float getShape(vec3 p, int id){
         return opSmoothUnion(opSmoothUnion(d1, d2, sdfBlendRadius), d3, sdfBlendRadius);
     }
     else if (id == 1) { return getSphere(p, c, r); }
-    else if (id == 2) { return getTorus (p, c, 12.0, 5.0); }
+    else if (id == 2) { return getTorus (p, c, 8.0, 3.0); }
     else if (id == 3) { return getCube  (p, c, halfExt, 1.0); }
     else if (id == 4) { return stratocumulusSDF(p); }
     else if (id == 5) { return stratusSDF(p); }
@@ -107,7 +107,7 @@ float getVolume(vec3 p){
 
     float d = mix(dPrev, dCurr, smoothstep(0.0, 1.0, uShapeTransition));
 
-    vec3 fbmCoord = (p + vec3(uTime*0.2, 0.0, uTime*0.2)) / uNoiseScale;
+    vec3 fbmCoord = (p + vec3(uTime*8.2, 0.0, uTime*8.2)) / uNoiseScale;
     if (uCurrentNoise == 2){
 
         d += uNoiseHeight * fbm(fbmCoord);

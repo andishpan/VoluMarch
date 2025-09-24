@@ -94,13 +94,13 @@ public class BatchBenchmark {
 
       System.out.println("[batch] All runs finished – generating plots...");
 
-      Path plotOutDir = Paths.get("C:\\RT\\VoluMarch\\results\\plots");
+      Path plotOutDir = Paths.get("results\\plots");
       try {
          List<String> cmd = new ArrayList<>();
          cmd.add("python");
-         cmd.add("C:\\RT\\VoluMarch\\scripts\\auto_plot_data.py");
+         cmd.add("scripts\\auto_plot_data.py");
          cmd.add("-b");
-         cmd.add("C:\\RT\\VoluMarch\\results\\average");
+         cmd.add("results\\average");
 
          ProcessBuilder pb = new ProcessBuilder(cmd);
          pb.directory(plotOutDir.toFile());

@@ -430,9 +430,10 @@ public class GuiController {
         ImGui.end();
 
 
-        ImGui.setNextWindowPos(10, 10, ImGuiCond.Always);
-        ImGui.setNextWindowSize(250, 0);
-        ImGui.begin("Volume Analysis Panel", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.setNextWindowPos(10, 10, ImGuiCond.FirstUseEver);
+        ImGui.setNextWindowSize(250, 0, ImGuiCond.FirstUseEver);
+        ImGui.begin("Volume Analysis Panel", ImGuiWindowFlags.AlwaysAutoResize);
+
 
 
         Vector3f cloudCenter = new Vector3f(0.0f, 20.0f, -25.0f);
