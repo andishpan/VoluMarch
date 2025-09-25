@@ -18,7 +18,7 @@ public class Data {
     private final List<Float> distanceTraveled = new ArrayList<>();
     private final List<Float> rayHitRatio = new ArrayList<>();
     private final int warmupFrames = 50;
-    private final int recordFrames = 600;
+    private final int recordFrames = 50;
     List<Integer> bounceSteps = new ArrayList<>();
     String runQuality = "";
     private long benchmarkStartTime;
@@ -81,9 +81,15 @@ public class Data {
 
 
     public void saveCsv(String file) throws IOException {
-        Path p = Paths.get(file).isAbsolute() ? Paths.get(file)
-                : Paths.get("results", file);
-        Files.createDirectories(p.getParent());
+        Path p;
+        if (Paths.get(file).isAbsolute()) {
+            p = Paths.get(file);
+        } else {
+            p = file.startsWith("results") ? Paths.get(file) : Paths.get("results", file);
+        }
+        if (!Files.exists(p.getParent())) {
+            throw new IOException("Results directory does not exist: " + p.getParent());
+        }
 
         try (BufferedWriter w = Files.newBufferedWriter(p)) {
             if (runQuality != null && !runQuality.isEmpty())
@@ -133,9 +139,16 @@ public class Data {
                                     String noiseType, int resolutionX, int resolutionY,
                                     RenderSettings settings, float distanceToCloud) throws IOException {
 
-        Path p = Paths.get(file).isAbsolute() ? Paths.get(file)
-                : Paths.get("results", file);
-        Files.createDirectories(p.getParent());
+        Path p;
+        if (Paths.get(file).isAbsolute()) {
+            p = Paths.get(file);
+        } else {
+            p = file.startsWith("results") ? Paths.get(file) : Paths.get("results", file);
+        }
+        if (!Files.exists(p.getParent())) {
+            throw new IOException("Results directory does not exist: " + p.getParent());
+        }
+        //Files.createDirectories(p.getParent());
 
         try (BufferedWriter w = Files.newBufferedWriter(p)) {
 
@@ -164,7 +177,7 @@ public class Data {
             w.write("#Total Rendering Time : " + getElapsedSeconds() + "\n\n");
 
             w.write("""
-                    metric,mean,std,min,50%%,max
+                    metric,mean,std,min,50%,max
                     """);
 
             record Stats(String name, double mean, double std, double min,

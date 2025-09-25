@@ -3,23 +3,43 @@ import re
 from pathlib import Path
 import pandas as pd
 import plotly.express as px
+import plotly.colors as pc
+from plotly.io import write_image
+from PIL import Image
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+
+
 
 RX = re.compile(r"^avg_(.+?)_(LOW|MID|HIGH|ULTRA).*\.csv$", re.I)
 STAGE_METRICS = ["volume", "shadow", "sdf"]
 TIME_METRIC = "gpu_ms"
 SAMPLE_METRICS = ["spp", "hit_ratio"]
 PRESET_ORDER = ["LOW", "MID", "HIGH", "ULTRA"]
-DISTANCE_COLOR_MAP = {60: "red", 120: "blue"}
-DISTANCE_STR_COLOR_MAP = {f"{d} Einheiten": c for d, c in DISTANCE_COLOR_MAP.items()}
+DISTANCE_COLOR_POOL = pc.qualitative.Plotly
 
 MODEL_DISPLAY_MAPPING = {
-    "beer_lambert": "Beer Lambert",
-    "mos": "Multiple Octave Scattering",
+    "beer_lambert": "BL",
+    "mos": "MOS",
     "powder": "Powder",
-    "henyey_greenstein": "Henyey Greenstein",
+    "henyey_greenstein": "HG",
+}
+
+PRESET_COLOR_MAP = {
+    "LOW": "#1f77b4",
+    "MID": "#ff7f0e",
+    "HIGH": "#2ca02c",
+    "ULTRA": "#d62728"
 }
 
 IMAGE_WIDTH, IMAGE_HEIGHT = 1600, 900
+
+
+def generate_color_map(distances):
+    unique_dists = sorted(set(distances))
+    colors = DISTANCE_COLOR_POOL * ((len(unique_dists) // len(DISTANCE_COLOR_POOL)) + 1)
+    return {f"{d} Einheiten": c for d, c in zip(unique_dists, colors)}
 
 
 def quality_suffix(df: pd.DataFrame) -> str:
@@ -27,10 +47,12 @@ def quality_suffix(df: pd.DataFrame) -> str:
     return f"_{presets[0]}" if len(presets) == 1 else ""
 
 
-def save_fig(fig, outpath_base: Path):
+def save_fig(fig, outpath: Path) -> Path:
+    outpath = outpath.with_suffix(".png")
     fig.update_layout(width=IMAGE_WIDTH, height=IMAGE_HEIGHT)
-    fig.write_image(outpath_base.with_suffix(".png"))
-    print(f"Erzeugt: {outpath_base.with_suffix('.png')}")
+    fig.show()
+    write_image(fig, str(outpath))
+    return outpath
 
 
 def read_csv(fp: Path) -> pd.DataFrame:
@@ -60,7 +82,7 @@ def read_csv(fp: Path) -> pd.DataFrame:
     return df
 
 
-def load_tidy(base: Path, latest_only=False) -> pd.DataFrame:
+def load_tidy(base: Path, latest_only=False):
     all_csvs = list(base.rglob("avg_*_*.csv"))
     if latest_only and all_csvs:
         all_csvs = [max(all_csvs, key=lambda f: f.stat().st_mtime)]
@@ -79,10 +101,13 @@ def load_tidy(base: Path, latest_only=False) -> pd.DataFrame:
     df.drop(columns=["model_lc"], inplace=True)
     df["distance_units"] = df["distance"].astype(str) + " Einheiten"
     df["distance_str"] = df["distance_units"]
-    return df
+    distance_str_color_map = generate_color_map(df["distance"].unique())
+    return df, distance_str_color_map
 
 
-def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
+
+
+def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None, color_map=None) -> Path | None:
     sub = df[df.metric.isin(SAMPLE_METRICS)]
     if model:
         sub = sub[sub.model == model]
@@ -111,7 +136,7 @@ def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None) -> No
             "hit_ratio": "Trefferrate",
             "preset": "Qualitätsstufe",
             "distance": "Entfernung (Einheiten)",
-            "model_display": "Modell"
+            "model_display": "Shader"
         },
         title="Effizienz der Abtastung"
     )
@@ -120,11 +145,10 @@ def sampling_efficiency(df: pd.DataFrame, outdir: Path, model: str = None) -> No
 
     sfx = quality_suffix(sub)
     outpath = outdir / (f"effizienz_{model}{sfx}" if model else f"effizienz{sfx}")
+    return save_fig(fig, outpath)
 
-    save_fig(fig, outpath)
 
-
-def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
+def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None, color_map=None) -> Path | None:
     sub = df[df.metric.isin([TIME_METRIC, "spp"])]
     if model:
         sub = sub[sub.model == model]
@@ -144,10 +168,10 @@ def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> N
 
     fig = px.bar(
         pivot,
-        x="preset", y="kosten_pro_abtastung", color="distance_str",
+        x="preset", y="kosten_pro_abtastung", color="preset",
         facet_col=(None if model else "model_display"),
         category_orders={"preset": PRESET_ORDER},
-        color_discrete_map=DISTANCE_STR_COLOR_MAP,
+        color_discrete_map=PRESET_COLOR_MAP,
         labels={
             "preset": "Qualitätsstufe",
             "kosten_pro_abtastung": "GPU-ms pro Abtastung",
@@ -158,11 +182,10 @@ def cost_per_sample_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> N
     )
     sfx = quality_suffix(pivot)
     outpath = outdir / (f"kosten_pro_abtastung_{model}{sfx}" if model else f"kosten_pro_abtastung{sfx}")
+    return save_fig(fig, outpath)
 
-    save_fig(fig, outpath)
 
-
-def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
+def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None, color_map=None) -> Path | None:
     pivot = df[["model", "model_display", "preset", "distance", "total_time"]].drop_duplicates()
     if model:
         pivot = pivot[pivot.model == model]
@@ -174,10 +197,10 @@ def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
     pivot["distance_str"] = pivot["distance"].astype(str) + " Einheiten"
     fig = px.bar(
         pivot,
-        x="preset", y="total_time", color="distance_str",
+        x="preset", y="total_time", color="preset",
         facet_col=(None if model else "model_display"),
         category_orders={"preset": PRESET_ORDER},
-        color_discrete_map=DISTANCE_STR_COLOR_MAP,
+        color_discrete_map=PRESET_COLOR_MAP,
         labels={
             "preset": "Qualitätsstufe",
             "total_time": "Gesamte Renderzeit (s)",
@@ -188,20 +211,29 @@ def total_time_plot(df: pd.DataFrame, outdir: Path, model: str = None) -> None:
     )
     sfx = quality_suffix(pivot)
     outpath = outdir / (f"gesamtzeit_{model}{sfx}" if model else f"gesamtzeit{sfx}")
-
-    save_fig(fig, outpath)
+    return save_fig(fig, outpath)
 
 
 def main():
+    all_output_pngs = []
+
     ap = argparse.ArgumentParser(description="Erzeuge PNG-Diagramme aus avg_*.csv")
     ap.add_argument("-b", "--base", type=Path, required=True, help="Stammordner: e.g. results/average/")
     ap.add_argument("--latest-only", action="store_true", help="Nur die neueste CSV analysieren")
     ap.add_argument("-q", "--quality", choices=PRESET_ORDER, default=None, help="Optionaler Preset-Filter")
+    ap.add_argument("-d", "--distance", type=int, default=None, help="Optionaler Filter für bestimmte Entfernung")
 
     args = ap.parse_args()
 
-    tidy = load_tidy(args.base, latest_only=args.latest_only)
-    base_out = Path.cwd()
+    tidy, distance_str_color_map = load_tidy(args.base, latest_only=args.latest_only)
+
+    if args.distance is not None:
+        tidy = tidy[tidy["distance"] == args.distance]
+        if tidy.empty:
+            raise RuntimeError(f"Keine Daten für Entfernung {args.distance}")
+
+    base_out = Path.cwd() / "results/plots"
+
 
     for dist, df_dist in tidy.groupby("distance"):
         models = df_dist["model"].unique().tolist()
@@ -211,15 +243,15 @@ def main():
             model = models[0]
             outdir = base_out / f"distance={dist}" / model
             outdir.mkdir(parents=True, exist_ok=True)
-            sampling_efficiency(df_dist, outdir, model)
-            cost_per_sample_plot(df_dist, outdir, model)
-            total_time_plot(df_dist, outdir, model)
+            sampling_efficiency(df_dist, outdir, model, distance_str_color_map)
+            cost_per_sample_plot(df_dist, outdir, model, distance_str_color_map)
+            total_time_plot(df_dist, outdir, model, distance_str_color_map)
         else:
             outdir = base_out / f"distance={dist}"
             outdir.mkdir(parents=True, exist_ok=True)
-            sampling_efficiency(df_dist, outdir)
-            cost_per_sample_plot(df_dist, outdir)
-            total_time_plot(df_dist, outdir)
+            sampling_efficiency(df_dist, outdir, None, distance_str_color_map)
+            cost_per_sample_plot(df_dist, outdir, None, distance_str_color_map)
+            total_time_plot(df_dist, outdir, None, distance_str_color_map)
 
 
 if __name__ == "__main__":

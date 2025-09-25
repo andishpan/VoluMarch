@@ -62,6 +62,11 @@ public class VolumeRaymarchLWJGL {
     private int environmentMapTexID;
     private int noiseID;
 
+    public RendererSSBO getRenderer() {
+        return this.renderer;
+    }
+
+
     public static void main(String[] args) throws IOException {
         VolumeRaymarchLWJGL app = new VolumeRaymarchLWJGL();
 
@@ -180,6 +185,17 @@ public class VolumeRaymarchLWJGL {
         window = glfwCreateWindow(width, height, "Volume Raymarch LWJGL", NULL, NULL);
         if (window == NULL) {
             throw new RuntimeException("Failed to create GLFW window");
+        }
+
+        GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        if (vidmode != null) {
+            int screenWidth = vidmode.width();
+            int screenHeight = vidmode.height();
+
+            int windowX = (screenWidth - width) / 2;
+            int windowY = (screenHeight - height) / 2;
+
+            glfwSetWindowPos(window, windowX, windowY);
         }
 
         glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
@@ -594,7 +610,8 @@ public class VolumeRaymarchLWJGL {
 
         float distanceToCloud = renderer.getDistanceToCloud();
         String distanceFolder = "distance=" + (int) distanceToCloud;
-        Path fullDir = Paths.get("results\\fullruns", distanceFolder, modelName);
+        Path resultsDir = Paths.get("results");
+        Path fullDir = resultsDir.resolve("fullruns").resolve(distanceFolder).resolve(modelName);
         Files.createDirectories(fullDir);
 
         String fullCsvFilename = "full_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
@@ -602,7 +619,7 @@ public class VolumeRaymarchLWJGL {
         bench.saveCsv(fullCsvPath.toString());
 
 
-        Path avgDir = Paths.get("results\\average", distanceFolder, modelName);
+        Path avgDir = resultsDir.resolve("average").resolve(distanceFolder).resolve(modelName);
         Files.createDirectories(avgDir);
         String avgCsvFilename = "avg_" + modelName + "_" + qualTag + resolutionTag + "_" + noiseTag + "_" + timeTag + ".csv";
         Path avgCsvPath = avgDir.resolve(avgCsvFilename);

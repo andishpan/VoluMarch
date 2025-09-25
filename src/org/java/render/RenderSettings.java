@@ -10,7 +10,7 @@ public class RenderSettings {
     public int numScreens = 1;
     public int resolutionX;
     public int resolutionY;
-    public Vector3f cameraPos = new Vector3f(4.0f, 1.2f, -81.3f);
+    public Vector3f cameraPos = new Vector3f(4.0f, 1.2f, -100.0f);
     public Vector3f cameraLookAt = new Vector3f(0.5f, 33.9f, -7.8f);
     public Vector3f cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
     public Vector3f sunDirection = new Vector3f(0.372f, 0.512f, -0.116f);
